@@ -58,3 +58,6 @@ gtest_discover_tests(unit_tests)
 # Benchmarks
 add_executable(microvtk_bench benchmarks/benchmark_main.cpp)
 target_link_libraries(microvtk_bench PRIVATE microvtk benchmark::benchmark)
+
+add_executable(bench_formatting benchmarks/bench_formatting.cpp)
+target_link_libraries(bench_formatting PRIVATE benchmark::benchmark)
