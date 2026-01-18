@@ -39,6 +39,13 @@ add_executable(unit_tests
 
 add_executable(example_basic examples/basic_usage.cpp)
 target_link_libraries(example_basic PRIVATE microvtk)
+
+add_executable(example_time_series examples/time_series.cpp)
+target_link_libraries(example_time_series PRIVATE microvtk)
+
+add_executable(example_complex_grid examples/complex_grid.cpp)
+target_link_libraries(example_complex_grid PRIVATE microvtk)
+
 target_link_libraries(unit_tests PRIVATE microvtk GTest::gtest GTest::gtest_main)
 
 include(GoogleTest)
