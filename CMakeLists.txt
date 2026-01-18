@@ -10,6 +10,10 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
 add_subdirectory(external/googletest)
 
+set(BENCHMARK_ENABLE_TESTING OFF CACHE BOOL "" FORCE)
+set(BENCHMARK_ENABLE_INSTALL OFF CACHE BOOL "" FORCE)
+add_subdirectory(external/benchmark)
+
 # Compiler Options
 if(MSVC)
     add_compile_options(/W4)
@@ -50,3 +54,7 @@ target_link_libraries(unit_tests PRIVATE microvtk GTest::gtest GTest::gtest_main
 
 include(GoogleTest)
 gtest_discover_tests(unit_tests)
+
+# Benchmarks
+add_executable(microvtk_bench benchmarks/benchmark_main.cpp)
+target_link_libraries(microvtk_bench PRIVATE microvtk benchmark::benchmark)

@@ -66,9 +66,27 @@ void append_range(R&& range, std::vector<uint8_t>& buffer) {
     }
   } else {
     // Slow path for non-contiguous ranges (e.g. strided views)
-    // We always write Little Endian
-    for (const auto& val : range) {
-      write_le(static_cast<T>(val), buffer);
+    if constexpr (std::ranges::sized_range<R>) {
+      // Optimization: Reserve/Resize once if we know the size
+      size_t count = std::ranges::size(range);
+      size_t bytes_needed = count * sizeof(T);
+      size_t start_idx = buffer.size();
+      buffer.resize(start_idx + bytes_needed);
+      uint8_t* dest = buffer.data() + start_idx;
+
+      for (const auto& val : range) {
+        T v = static_cast<T>(val);
+        if constexpr (std::endian::native == std::endian::big) {
+          v = internal::byteswap(v);
+        }
+        std::memcpy(dest, &v, sizeof(T));
+        dest += sizeof(T);
+      }
+    } else {
+      // Fallback: Unknown size, append one by one
+      for (const auto& val : range) {
+        write_le(static_cast<T>(val), buffer);
+      }
     }
   }
 }
