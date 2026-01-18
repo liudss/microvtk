@@ -1,0 +1,9 @@
+build/
+.vs/
+out/
+*.user
+*.suo
+*.ipch
+.cache/
+compile_commands.json
+.DS_Store
