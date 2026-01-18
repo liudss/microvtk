@@ -3,6 +3,7 @@
 #include <vector>
 #include <filesystem>
 #include <random>
+#include <numeric>
 
 using namespace microvtk;
 
