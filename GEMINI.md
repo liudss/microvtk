@@ -3,18 +3,19 @@
 ## 1. Role & Objective
 You are a Senior C++ Systems Engineer specializing in High-Performance Computing (HPC) and Visualization.
 **Your Goal:** Implement `MicroVTK`, a lightweight, header-only, modern C++20 library for writing VTK files (`.vtu`, `.pvd`).
-**Constraints:** - Strict C++20 standard (Concepts, Spans, Ranges).
+**Constraints:** 
+- Strict C++20 standard (Concepts, Spans, Ranges, `std::format`).
 - **Zero-Dependency** for the core library (no external XML or Compression libs).
-- **Zero-Copy** architecture using `std::span` and Adapters.
-- Optimized for "Appended Binary" format (Raw binary dump) for speed.
+- **True Zero-Copy** streaming architecture using Type Erasure (`DataAccessor`).
+- Optimized for "Appended Binary" format (Raw binary dump) with minimal memory footprint.
 
 ---
 
 ## 2. Development Environment
-* **OS:** Windows (MSYS2 UCRT64 environment).
+* **OS:** Linux / Windows (MSYS2 UCRT64).
 * **Build System:** CMake 3.25+ (Generator: Ninja).
 * **Compilers:** Must compile cleanly on **GCC 13+** and **Clang 16+**.
-* **Tools:** `clang-format` (Google Style), `clang-tidy` (Performance & Modernize checks).
+* **Tools:** `clang-format` (Google Style), `clang-tidy`, `gcovr` (Coverage).
 * **Testing:** GoogleTest (GTest) via Git Submodule.
 
 ---
@@ -24,142 +25,95 @@ You are a Senior C++ Systems Engineer specializing in High-Performance Computing
 ### 3.1 Directory Structure
 ```text
 microvtk/
+├── benchmarks/             # Google Benchmark suites
 ├── cmake/                  # CMake helper modules
 ├── examples/               # Usage examples
-├── external/               # Third-party dependencies
-│   └── googletest/         # Git submodule
+├── external/               # Third-party dependencies (GTest, Benchmark)
 ├── include/
 │   └── microvtk/
 │       ├── common/         # Enums, Concepts, Traits
-│       ├── core/           # XML Builder, Endianness, Base64, binary buffers
-│       ├── vtu_writer.hpp  # Main UnstructuredGrid Writer
-│       ├── pvd_writer.hpp  # Time Series Writer
-│       ├── adapter.hpp     # Data Adapters (Zero-copy)
+│       ├── core/           
+│       │   ├── binary_utils.hpp   # Endianness, Base64
+│       │   ├── data_accessor.hpp # Type-erased data streaming (Zero-copy)
+│       │   └── xml_utils.hpp     # std::format based XML builder
+│       ├── vtu_writer.hpp  # Main UnstructuredGrid Writer (Streaming)
+│       ├── pvd_writer.hpp  # Time Series Writer (Explicit Save)
+│       ├── adapter.hpp     # Data Adapters (AoS support)
 │       └── microvtk.hpp    # Main entry header
 ├── tests/                  # Unit tests (GTest)
 ├── CMakeLists.txt
 └── .clang-format
-
 ```
 
 ### 3.2 Key Design Decisions
 
 1. **File Format:** Focus on **XML UnstructuredGrid (.vtu)** using **Appended Mode**.
-* *Structure:* XML Metadata -> `<AppendedData>` -> `_` (marker) -> `[SizeHeader][BinaryData]...`
-* *Why:* Fastest write speed, smallest parsing overhead.
-
-
-2. **Memory Management:** * The library does **not** own data (except the internal binary buffer for writing).
-* It uses `std::span<const T>` to view user data.
-
-
-3. **Endianness:** VTK XML defaults to Little Endian. The library must detect host endianness and swap bytes if necessary (e.g., using `std::byteswap` or `std::endian`).
-4. **Adapters:** Use C++20 Concepts (`std::ranges::contiguous_range`) and custom traits to allow users to pass `std::vector`, `std::array`, `Eigen::Matrix`, or AoS structs directly.
+2. **Streaming Write (Zero-Copy):** 
+    - The library does **not** buffer binary data in memory.
+    - It uses `core::DataAccessor` to store references to user containers.
+    - Data is streamed directly from user memory to disk during the `write()` call.
+    - **Note:** User must ensure data longevity until `write()` completes.
+3. **XML Generation:** Powered by `std::format` (C++20) for superior performance over `std::stringstream`.
+4. **Endianness:** VTK XML defaults to Little Endian. The library detects host endianness and performs on-the-fly byte swapping during streaming if necessary.
 
 ---
 
-## 4. Implementation Roadmap (Execute Sequentially)
+## 4. Implementation Status
 
-### Phase 1: Infrastructure & Scaffolding
+### Phase 1-3: Core & Adapters (Completed)
+- Full support for C++20 Ranges and Spans.
+- `vtk::adapt` for Array-of-Structures (AoS) processing.
+- Type-erased `DataAccessor` for seamless integration of various container types.
 
-* **Task:** Setup CMake, git submodule, and directory tree.
-* **Requirement:** Ensure `cmake --build` works and links GTest.
-* **File:** `CMakeLists.txt` must expose `microvtk` as an `INTERFACE` library.
+### Phase 4: VTU Writer (Completed)
+- Implemented **Streaming Mode**.
+- Virtual offset tracking for XML metadata.
+- Support for Points, Cells (Topology), PointData, and CellData attributes.
+- Built-in validation for array size consistency.
 
-### Phase 2: Core Utilities (The Foundation)
-
-* **Task:** Implement independent utilities.
-* **Files:**
-* `include/microvtk/common/types.hpp`: Enums for `CellType` (Tetra=10, Hex=12, etc.) and `DataFormat`.
-* `include/microvtk/core/xml_utils.hpp`: A minimal stream-based XML builder (no deps).
-* `include/microvtk/core/binary_utils.hpp`:
-* `Base64` encoder (for the header of binary blocks, if needed, though Raw uses size headers).
-* `Endian` handling.
-* `append_buffer`: A helper to push `std::span` data into a `std::vector<uint8_t>`.
-
-
-
-
-
-### Phase 3: The Data Adapter Layer (C++20 Magic)
-
-* **Task:** Implement the Zero-Copy mechanism.
-* **File:** `include/microvtk/adapter.hpp`.
-* **Logic:**
-* Define `concept Scalar` and `concept NumericRange`.
-* Implement `vtk::view(container)` that returns `std::span<const T>`.
-* Implement `vtk::adapt(container, &Struct::member)` to handle Array-of-Structures (AoS). *Note: For Appended mode, AoS data must be copied to the contiguous binary buffer internally.*
-
-
-
-### Phase 4: VTU Writer (Appended Mode Logic)
-
-* **Task:** The main logic.
-* **File:** `include/microvtk/vtu_writer.hpp`.
-* **Workflow:**
-1. User calls `writer.setPoints(data)`.
-2. Writer appends data to internal `std::vector<uint8_t> binary_blob_`.
-3. Writer records `offset` (start position in blob) and `size`.
-4. User calls `writer.write(filename)`.
-5. Writer generates XML using recorded offsets, then dumps `binary_blob_` at the end.
-
-
-* **Header Format:** For each binary block: `[uint32_t payload_size] + [payload_bytes]`.
-
-### Phase 5: PVD Writer (Time Series)
-
-* **Task:** Link multiple VTU files.
-* **File:** `include/microvtk/pvd_writer.hpp`.
-* **Logic:** Simple XML generation. Support `overwrite` mode for live updates.
+### Phase 5: PVD Writer (Completed)
+- Support for multi-step time series.
+- **Explicit Save**: Performance-optimized to avoid redundant I/O during simulation loops.
 
 ---
 
 ## 5. Coding Standards & Quality Gates
 
-* **Namespace:** All code under `namespace microvtk`.
-* **Style:** Google C++ Style (`.clang-format`).
-* **Safety:** Use `static_assert` to prevent unsupported types. Use `std::bit_cast` for safe type punning if needed.
-* **Documentation:** Doxygen-style `///` comments for public APIs.
-* **Testing:** Every feature must have a corresponding test in `tests/`.
+* **Namespace:** `namespace microvtk`.
+* **Safety:** Size validation on topology arrays. `noexcept` specifications on performance-critical adapters.
+* **Testing:** Comprehensive unit tests covering edge cases (Base64 padding, non-contiguous containers).
+* **Coverage:** Target >85% (excluding platform-specific endian logic).
 
 ---
 
-## 6. Detailed API Specification (Reference)
+## 6. API Specification (Final)
 
 ```cpp
-// Example Usage to guide your implementation:
 using namespace microvtk;
 
 // 1. Setup Writer
-VtuWriter writer(DataFormat::Appended);
+VtuWriter writer;
 
-// 2. Data (Zero Copy)
+// 2. Data (Zero Copy - References stored)
 std::vector<double> points = { ... };
 writer.setPoints(points);
 
-// 3. Topology
+// 3. Topology (Validation included)
 std::vector<int32_t> conn = { ... };
 std::vector<int32_t> offsets = { ... };
 std::vector<uint8_t> types = { ... };
 writer.setCells(conn, offsets, types);
 
-// 4. Attributes (using Adapters)
-struct Particle { double mass; double vel[3]; };
+// 4. Attributes (AoS supported)
+struct Particle { double mass; };
 std::vector<Particle> parts = ...;
-
-// Writes 1 component array
 writer.addPointData("Mass", adapt(parts, &Particle::mass)); 
-// Writes 3 component array
-// Note: You need to implement logic to handle array members or flatten them
-writer.addPointData("Velocity", adapt(parts, &Particle::vel)); 
 
-// 5. Write to disk
+// 5. Write to disk (Direct stream from 'points', 'conn', etc.)
 writer.write("output.vtu");
 
+// 6. Time Series
+PvdWriter pvd("sim.pvd");
+pvd.addStep(0.0, "step0.vtu");
+pvd.save(); // Explicit save for performance
 ```
-
----
-
-## Instruction to Agent
-
-Start by initializing the project structure and Phase 1 (CMake/Conan). Once confirmed working, proceed phase by phase. **Always implement the Header-only library code first, then the corresponding Unit Test.**
