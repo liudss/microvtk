@@ -18,14 +18,14 @@ concept NumericRange =
 
 // View: Returns a span for contiguous containers
 template <NumericRange Container>
-auto view(const Container& c) {
+auto view(const Container& c) noexcept {
   return std::span(c);
 }
 
 // Adapt: Returns a view for AoS member access
 // Usage: adapt(particles, &Particle::mass)
 template <std::ranges::range Container, typename MemberType, typename ClassType>
-auto adapt(const Container& c, MemberType ClassType::* member) {
+auto adapt(const Container& c, MemberType ClassType::* member) noexcept {
   return c |
          std::views::transform([member](const auto& obj) -> const MemberType& {
            return obj.*member;

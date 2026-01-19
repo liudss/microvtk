@@ -39,6 +39,7 @@ add_executable(unit_tests
     tests/test_adapter.cpp
     tests/test_vtu_writer.cpp
     tests/test_pvd_writer.cpp
+    tests/test_vtu_validation.cpp
 )
 
 add_executable(example_basic examples/basic_usage.cpp)

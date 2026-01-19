@@ -14,16 +14,15 @@ public:
   /// @param filename Path to the .pvd file.
   explicit PvdWriter(std::string_view filename) : filename_(filename) {}
 
-  /// Add a time step and immediately update the PVD file.
+  /// Add a time step.
   /// @param time Simulation time.
   /// @param vtu_file Relative path to the .vtu file for this step.
   void addStep(double time, std::string_view vtu_file) {
     steps_.emplace_back(time, std::string(vtu_file));
-    write();
   }
 
-private:
-  void write() {
+  /// Write the PVD file to disk.
+  void save() {
     std::ofstream ofs(filename_);
     core::XmlBuilder xml(ofs);
 
@@ -48,6 +47,7 @@ private:
     xml.endElement();  // Close VTKFile
   }
 
+private:
   std::string filename_;
   std::vector<std::pair<double, std::string>> steps_;
 };

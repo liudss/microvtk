@@ -5,6 +5,7 @@
 #include <microvtk/common/types.hpp>
 #include <microvtk/core/binary_utils.hpp>
 #include <microvtk/core/xml_utils.hpp>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <variant>
@@ -30,6 +31,10 @@ public:
   // types: CellType enum values
   template <std::ranges::range R1, std::ranges::range R2, std::ranges::range R3>
   void setCells(const R1& connectivity, const R2& offsets, const R3& types) {
+    if (std::ranges::size(offsets) != std::ranges::size(types)) {
+      throw std::invalid_argument(
+          "VtuWriter::setCells: Size mismatch between offsets and types.");
+    }
     numberOfCells_ = std::ranges::size(types);
 
     cellsConnBlock_ = appendData(connectivity, "connectivity", 1);

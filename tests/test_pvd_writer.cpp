@@ -12,6 +12,7 @@ TEST(PvdWriter, WriteSteps) {
     PvdWriter writer(filename);
     writer.addStep(0.1, "step_0.vtu");
     writer.addStep(0.2, "step_1.vtu");
+    writer.save();
   }
 
   ASSERT_TRUE(std::filesystem::exists(filename));
