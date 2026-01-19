@@ -15,7 +15,7 @@
 
 namespace microvtk::core {
 
-enum class CompressionType {
+enum class CompressionType : uint8_t {
     None,
     ZLib,
     LZ4

@@ -15,7 +15,7 @@ struct DataAccessor {
   virtual ~DataAccessor() = default;
   virtual void write_to(std::vector<uint8_t>& buffer) const = 0; // Legacy support (optional)
   virtual void write_to_stream(std::ostream& os) const = 0;
-  virtual size_t size_bytes() const = 0;
+  [[nodiscard]] virtual size_t size_bytes() const = 0;
 };
 
 // Concrete implementation for a specific range type
@@ -33,7 +33,7 @@ public:
       // Determine if we can just write raw bytes
       if constexpr (std::ranges::contiguous_range<R> && std::endian::native == std::endian::little) {
           auto data_span = std::span{range_};
-          os.write(reinterpret_cast<const char*>(data_span.data()), data_span.size_bytes());
+          os.write(reinterpret_cast<const char*>(data_span.data()), static_cast<std::streamsize>(data_span.size_bytes()));
       } else {
           // Slow path: copy to small buffer and write or write element by element
           // Using a small buffer for buffering is better than 1-byte writes
@@ -46,17 +46,17 @@ public:
           for (const auto& val : range_) {
               microvtk::core::write_le(val, temp);
               if (temp.size() >= 4096) {
-                  os.write(reinterpret_cast<const char*>(temp.data()), temp.size());
+                  os.write(reinterpret_cast<const char*>(temp.data()), static_cast<std::streamsize>(temp.size()));
                   temp.clear();
               }
           }
           if (!temp.empty()) {
-              os.write(reinterpret_cast<const char*>(temp.data()), temp.size());
+              os.write(reinterpret_cast<const char*>(temp.data()), static_cast<std::streamsize>(temp.size()));
           }
       }
   }
 
-  size_t size_bytes() const override {
+  [[nodiscard]] size_t size_bytes() const override {
     using T = std::ranges::range_value_t<R>;
     return std::ranges::size(range_) * sizeof(T);
   }
