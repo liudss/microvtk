@@ -32,15 +32,29 @@ if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
         if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/external/zlib/CMakeLists.txt")
             set(ZLIB_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
             set(ZLIB_BUILD_TESTING OFF CACHE BOOL "" FORCE)
+            # Force static build for dependencies to avoid DLL issues
+            set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build shared libraries" FORCE)
+            set(ZLIB_BUILD_SHARED OFF CACHE BOOL "Build shared zlib" FORCE)
+            set(ZLIB_BUILD_STATIC ON CACHE BOOL "Build static zlib" FORCE)
             add_subdirectory(external/zlib)
             if(NOT TARGET ZLIB::ZLIB)
-                add_library(ZLIB::ZLIB ALIAS zlib)
+                if(TARGET zlibstatic)
+                     add_library(ZLIB::ZLIB ALIAS zlibstatic)
+                elseif(TARGET zlib)
+                     add_library(ZLIB::ZLIB ALIAS zlib)
+                endif()
             endif()
             # zlib typically adds its source dir to include path for itself, 
             # but we need to ensure interface includes if it doesn't propagate them nicely in older versions.
-            target_include_directories(zlib INTERFACE 
-                $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/external/zlib>
-            )
+            if(TARGET zlib)
+                target_include_directories(zlib INTERFACE 
+                    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/external/zlib>
+                )
+            elseif(TARGET zlibstatic)
+                target_include_directories(zlibstatic INTERFACE 
+                    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/external/zlib>
+                )
+            endif()
         else()
             message(FATAL_ERROR "ZLIB enabled but external/zlib not found. Did you run 'git submodule update --init'?")
         endif()
