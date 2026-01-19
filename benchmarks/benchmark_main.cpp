@@ -84,6 +84,61 @@ static void BM_WriteVtu_Large(benchmark::State& state) {
 // Test up to ~8 million points (approx 200MB+ data) to see memory impact indirectly via speed
 BENCHMARK(BM_WriteVtu_Large)->Range(1024 * 1024, 8 * 1024 * 1024);
 
+#include <microvtk/core/compressor.hpp>
+#include <list>
+
+static void BM_WriteCompressed(benchmark::State& state) {
+    size_t num_points = state.range(0);
+    auto points = GeneratePoints(num_points);
+    std::vector<int32_t> conn(num_points);
+    std::iota(conn.begin(), conn.end(), 0);
+    std::vector<int32_t> offsets(num_points / 4);
+    for(size_t i=0; i<offsets.size(); ++i) offsets[i] = (i+1)*4;
+    std::vector<uint8_t> types(num_points / 4, static_cast<uint8_t>(CellType::Tetra));
+
+    core::CompressionType type = static_cast<core::CompressionType>(state.range(1));
+    
+    std::string filename = "bench_comp_" + std::to_string(num_points) + "_" + std::to_string(state.range(1)) + ".vtu";
+
+    for (auto _ : state) {
+        VtuWriter writer(DataFormat::Appended);
+        writer.setCompression(type);
+        writer.setPoints(points);
+        writer.setCells(conn, offsets, types);
+        writer.write(filename);
+    }
+    
+    // Cleanup
+    std::filesystem::remove(filename);
+}
+
+// Compare None(0), ZLib(1), LZ4(2) for 256k points
+BENCHMARK(BM_WriteCompressed)
+    ->Args({262144, static_cast<int>(core::CompressionType::None)})
+    ->Args({262144, static_cast<int>(core::CompressionType::ZLib)})
+    ->Args({262144, static_cast<int>(core::CompressionType::LZ4)})
+    ->Unit(benchmark::kMillisecond);
+
+static void BM_WriteNonContiguous(benchmark::State& state) {
+    size_t num_points = state.range(0);
+    // std::list is a non-contiguous container
+    std::list<double> points_list;
+    {
+        std::vector<double> tmp = GeneratePoints(num_points);
+        std::copy(tmp.begin(), tmp.end(), std::back_inserter(points_list));
+    }
+    
+    std::string filename = "bench_list_" + std::to_string(num_points) + ".vtu";
+
+    for (auto _ : state) {
+        VtuWriter writer(DataFormat::Appended);
+        writer.setPoints(points_list);
+        writer.write(filename);
+    }
+    std::filesystem::remove(filename);
+}
+BENCHMARK(BM_WriteNonContiguous)->Range(1024, 65536);
+
 struct Particle {
     double mass;
     double vel[3];
