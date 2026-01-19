@@ -15,6 +15,11 @@ You are a Senior C++ Systems Engineer specializing in High-Performance Computing
 * **OS:** Linux / Windows (MSYS2 UCRT64).
 * **Build System:** CMake 3.25+ (Generator: Ninja).
 * **Compilers:** Must compile cleanly on **GCC 13+** and **Clang 16+**.
+* **Dependencies:**
+    * **GoogleTest:** Git submodule (testing).
+    * **Google Benchmark:** Git submodule (benchmarking).
+    * **ZLIB:** Git submodule (optional, for compression).
+    * **LZ4:** Git submodule (optional, for compression).
 * **Tools:** `clang-format` (Google Style), `clang-tidy`, `gcovr` (Coverage).
 * **Testing:** GoogleTest (GTest) via Git Submodule.
 

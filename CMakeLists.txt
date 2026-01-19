@@ -10,12 +10,71 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 option(MICROVTK_BUILD_TESTS "Build unit tests" OFF)
 option(MICROVTK_BUILD_EXAMPLES "Build examples" OFF)
 option(MICROVTK_BUILD_BENCHMARKS "Build benchmarks" OFF)
+option(MICROVTK_USE_ZLIB "Enable ZLib compression support" ON)
+option(MICROVTK_USE_LZ4 "Enable LZ4 compression support" ON)
 
 # Default to ON if top-level project
 if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
     set(MICROVTK_BUILD_TESTS ON CACHE BOOL "Build unit tests" FORCE)
     set(MICROVTK_BUILD_EXAMPLES ON CACHE BOOL "Build examples" FORCE)
     set(MICROVTK_BUILD_BENCHMARKS ON CACHE BOOL "Build benchmarks" FORCE)
+endif()
+
+# Dependencies
+if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
+    # -------------------------------------------------------------------------
+    # Development / Standalone Build: Use Bundled Dependencies (Submodules)
+    # -------------------------------------------------------------------------
+    message(STATUS "MicroVTK: Building in standalone mode, using bundled dependencies.")
+
+    # ZLIB
+    if(MICROVTK_USE_ZLIB)
+        if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/external/zlib/CMakeLists.txt")
+            set(ZLIB_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+            set(ZLIB_BUILD_TESTING OFF CACHE BOOL "" FORCE)
+            add_subdirectory(external/zlib)
+            if(NOT TARGET ZLIB::ZLIB)
+                add_library(ZLIB::ZLIB ALIAS zlib)
+            endif()
+            # zlib typically adds its source dir to include path for itself, 
+            # but we need to ensure interface includes if it doesn't propagate them nicely in older versions.
+            target_include_directories(zlib INTERFACE 
+                $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/external/zlib>
+            )
+        else()
+            message(FATAL_ERROR "ZLIB enabled but external/zlib not found. Did you run 'git submodule update --init'?")
+        endif()
+    endif()
+
+    # LZ4
+    if(MICROVTK_USE_LZ4)
+        if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/external/lz4/build/cmake/CMakeLists.txt")
+            set(LZ4_BUILD_CLI OFF CACHE BOOL "" FORCE)
+            set(LZ4_BUILD_LEGACY_LZ4C OFF CACHE BOOL "" FORCE)
+            add_subdirectory(external/lz4/build/cmake)
+            # LZ4 cmake usually defines target 'lz4_static' or 'lz4_shared' depending on options.
+            # It creates an alias 'lz4::lz4' usually.
+        else()
+            message(FATAL_ERROR "LZ4 enabled but external/lz4 not found. Did you run 'git submodule update --init'?")
+        endif()
+    endif()
+
+else()
+    # -------------------------------------------------------------------------
+    # Library Usage Mode: Use System/User Provided Dependencies
+    # -------------------------------------------------------------------------
+    if(MICROVTK_USE_ZLIB)
+        find_package(ZLIB REQUIRED)
+    endif()
+
+    if(MICROVTK_USE_LZ4)
+        # Try finding LZ4 via Config mode first, then PkgConfig
+        find_package(lz4 CONFIG)
+        if(NOT lz4_FOUND)
+            find_package(PkgConfig REQUIRED)
+            pkg_check_modules(LZ4 REQUIRED liblz4)
+        endif()
+    endif()
 endif()
 
 # Main Library (Header-Only)
@@ -26,6 +85,28 @@ target_include_directories(microvtk INTERFACE
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>
 )
+
+if(MICROVTK_USE_ZLIB)
+    target_compile_definitions(microvtk INTERFACE MICROVTK_HAS_ZLIB)
+    target_link_libraries(microvtk INTERFACE ZLIB::ZLIB)
+endif()
+
+if(MICROVTK_USE_LZ4)
+    target_compile_definitions(microvtk INTERFACE MICROVTK_HAS_LZ4)
+    if(TARGET lz4::lz4)
+         target_link_libraries(microvtk INTERFACE lz4::lz4)
+    elseif(TARGET lz4_static)
+         target_link_libraries(microvtk INTERFACE lz4_static)
+    elseif(TARGET PkgConfig::LZ4)
+         target_link_libraries(microvtk INTERFACE PkgConfig::LZ4)
+    else()
+         # Fallback if PkgConfig just gave variables
+         target_include_directories(microvtk INTERFACE ${LZ4_INCLUDE_DIRS})
+         target_link_libraries(microvtk INTERFACE ${LZ4_LIBRARIES})
+    endif()
+endif()
+
+
 
 # Helper for strict warnings (only applied to internal targets)
 function(microvtk_set_strict_warnings target)
@@ -62,6 +143,7 @@ if(MICROVTK_BUILD_TESTS)
             tests/test_pvd_writer.cpp
             tests/test_vtu_validation.cpp
             tests/test_coverage_gap.cpp
+            tests/test_compression.cpp
         )
         microvtk_set_strict_warnings(unit_tests)
         target_link_libraries(unit_tests PRIVATE microvtk GTest::gtest GTest::gtest_main)
