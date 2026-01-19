@@ -1,9 +1,11 @@
 #pragma once
 
 #include <fstream>
+#include <memory>
 #include <microvtk/adapter.hpp>
 #include <microvtk/common/types.hpp>
 #include <microvtk/core/binary_utils.hpp>
+#include <microvtk/core/data_accessor.hpp>
 #include <microvtk/core/xml_utils.hpp>
 #include <stdexcept>
 #include <string>
@@ -22,7 +24,7 @@ public:
   template <std::ranges::range R>
   void setPoints(const R& points) {
     numberOfPoints_ = std::ranges::size(points) / 3;
-    pointsBlock_ = appendData(points, "Points", 3);
+    pointsBlock_ = registerData(points, "Points", 3);
   }
 
   // 2. Set Cells (Topology)
@@ -37,23 +39,23 @@ public:
     }
     numberOfCells_ = std::ranges::size(types);
 
-    cellsConnBlock_ = appendData(connectivity, "connectivity", 1);
-    cellsOffsetsBlock_ = appendData(offsets, "offsets", 1);
-    cellsTypesBlock_ = appendData(types, "types", 1);
+    cellsConnBlock_ = registerData(connectivity, "connectivity", 1);
+    cellsOffsetsBlock_ = registerData(offsets, "offsets", 1);
+    cellsTypesBlock_ = registerData(types, "types", 1);
   }
 
   // 3. Add Point Data (Attribute)
   template <std::ranges::range R>
   void addPointData(std::string_view name, const R& data,
                     int numComponents = 1) {
-    pointDataBlocks_.push_back(appendData(data, name, numComponents));
+    pointDataBlocks_.push_back(registerData(data, name, numComponents));
   }
 
   // 4. Add Cell Data (Attribute)
   template <std::ranges::range R>
   void addCellData(std::string_view name, const R& data,
                    int numComponents = 1) {
-    cellDataBlocks_.push_back(appendData(data, name, numComponents));
+    cellDataBlocks_.push_back(registerData(data, name, numComponents));
   }
 
   // 5. Write to file
@@ -113,36 +115,24 @@ public:
     // Start marker
     xml.writeRaw(">_");
 
-    // Dump binary data
-    // Note: XmlBuilder might have tried to close the tag or manage state.
-    // We need to bypass it slightly for raw dump or ensure it's clean.
-    // However, standard XML writers usually don't handle mixed content like
-    // this easily. But AppendedData content is technically text/CDATA but here
-    // it's raw bytes. VTK spec: <AppendedData
-    // encoding="raw">_...binary...</AppendedData>
+    // Stream binary data directly from registered accessors
+    for (const auto& accessor : accessors_) {
+      // 1. Write Header (Size of data in bytes)
+      uint64_t dataSize = accessor->size_bytes();
+      
+      // We need to write this uint64_t in Little Endian
+      // Reuse core::write_le but we need a buffer or direct stream write
+      // Let's use a small local buffer for the header
+      std::vector<uint8_t> headerBuf;
+      headerBuf.reserve(8);
+      core::write_le(dataSize, headerBuf);
+      ofs.write(reinterpret_cast<const char*>(headerBuf.data()), headerBuf.size());
 
-    // Write the blob
-    ofs.write(reinterpret_cast<const char*>(appendedData_.data()),
-              static_cast<std::streamsize>(appendedData_.size()));
+      // 2. Write Data Payload
+      accessor->write_to_stream(ofs);
+    }
 
-    // Close AppendedData manually because of the raw dump hack or just use
-    // endElement if we assume it closes correctly. XmlBuilder::endElement()
-    // prints </AppendedData> But we are in "InStartTag" state internally in
-    // builder if we just did startElement. We manually wrote ">_", so we need
-    // to update builder state or just finish manually.
-
-    // Actually, XmlBuilder.startElement leaves state InStartTag.
-    // If we write raw to stream, we should probably tell builder we are done
-    // with start tag. But let's just close it manually.
     ofs << "</AppendedData>\n";
-
-    // We shouldn't call xml.endElement() for AppendedData because we manually
-    // closed it. But we need to close VTKFile. Hack: Pop the stack in builder
-    // manually or just let it close remaining? Let's rely on RAII or manual
-    // closing? Better: XmlBuilder should support "writeRaw".
-
-    // For now, I will just manually close VTKFile and be done,
-    // effectively abandoning the builder for the very last part.
     ofs << "</VTKFile>";
   }
 
@@ -156,23 +146,27 @@ private:
   };
 
   template <std::ranges::range R>
-  DataBlockInfo appendData(const R& data, std::string_view name,
-                           int numComponents) {
+  DataBlockInfo registerData(const R& data, std::string_view name,
+                             int numComponents) {
     using T = std::ranges::range_value_t<R>;
 
     DataBlockInfo info;
     info.name = name;
-    info.offset = appendedData_.size();
+    // Current virtual offset
+    info.offset = currentOffset_;
     info.typeName = vtkTypeName<std::remove_const_t<T>>();
     info.numComponents = numComponents;
     info.valid = true;
 
-    // Header: Size of data in bytes (UInt64)
-    uint64_t dataSize = std::ranges::size(data) * sizeof(T);
-    core::write_le(dataSize, appendedData_);
+    // Create accessor to hold reference
+    // Note: User must ensure 'data' outlives the writer or the write() call!
+    auto accessor = std::make_unique<core::RangeAccessor<R>>(data);
+    
+    // Calculate size: Header (8 bytes) + Data Bytes
+    uint64_t payloadSize = accessor->size_bytes();
+    currentOffset_ += sizeof(uint64_t) + payloadSize;
 
-    // Data
-    core::append_range(data, appendedData_);
+    accessors_.push_back(std::move(accessor));
 
     return info;
   }
@@ -189,7 +183,9 @@ private:
     xml.endElement();
   }
 
-  std::vector<uint8_t> appendedData_;
+  // Replaces appendedData_
+  std::vector<std::unique_ptr<core::DataAccessor>> accessors_;
+  uint64_t currentOffset_ = 0;
 
   size_t numberOfPoints_ = 0;
   size_t numberOfCells_ = 0;
