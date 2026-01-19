@@ -1,6 +1,7 @@
 #pragma once
 
 #include <concepts>
+#include <format>
 #include <iostream>
 #include <string>
 #include <string_view>
@@ -24,7 +25,7 @@ public:
       indent();
     }
 
-    os_ << "<" << name;
+    os_ << std::format("<{}", name);
     element_stack_.emplace_back(name);
     state_ = State::InStartTag;
     depth_++;
@@ -32,13 +33,13 @@ public:
 
   // Adds an attribute: key="value"
   void attribute(std::string_view name, std::string_view value) {
-    os_ << " " << name << "=\"" << value << "\"";
+    os_ << std::format(" {}=\"{}\"", name, value);
   }
 
   // Adds an attribute with numeric value
   template <typename T>
   void attribute(std::string_view name, const T& value) {
-    os_ << " " << name << "=\"" << value << "\"";
+    os_ << std::format(" {}=\"{}\"", name, value);
   }
 
   // Closes the current element
@@ -56,7 +57,7 @@ public:
     } else {
       // Normal closing: </Name>
       if (pretty_) indent();
-      os_ << "</" << name << ">";
+      os_ << std::format("</{}>", name);
       if (pretty_) os_ << "\n";
     }
     state_ = State::Content;
