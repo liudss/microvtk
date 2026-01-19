@@ -54,6 +54,36 @@ static void BM_WriteVtu(benchmark::State& state) {
 }
 BENCHMARK(BM_WriteVtu)->Range(1024, 256 * 1024); // Limit size for IO bench
 
+static void BM_WriteVtu_Large(benchmark::State& state) {
+    size_t num_points = state.range(0);
+    auto points = GeneratePoints(num_points);
+    std::vector<int32_t> conn(num_points);
+    std::iota(conn.begin(), conn.end(), 0);
+    std::vector<int32_t> offsets(num_points / 4);
+    for(size_t i=0; i<offsets.size(); ++i) offsets[i] = (i+1)*4;
+    std::vector<uint8_t> types(num_points / 4, static_cast<uint8_t>(CellType::Tetra));
+
+    std::string filename = "bench_large_" + std::to_string(num_points) + ".vtu";
+
+    for (auto _ : state) {
+        VtuWriter writer(DataFormat::Appended);
+        writer.setPoints(points);
+        writer.setCells(conn, offsets, types);
+        writer.write(filename);
+    }
+    
+    uint64_t bytes_written = num_points * 3 * sizeof(double) + 
+                             num_points * sizeof(int32_t) + 
+                             offsets.size() * sizeof(int32_t) + 
+                             types.size() * sizeof(uint8_t);
+    state.SetBytesProcessed(int64_t(state.iterations()) * bytes_written);
+
+    // Cleanup
+    std::filesystem::remove(filename);
+}
+// Test up to ~8 million points (approx 200MB+ data) to see memory impact indirectly via speed
+BENCHMARK(BM_WriteVtu_Large)->Range(1024 * 1024, 8 * 1024 * 1024);
+
 struct Particle {
     double mass;
     double vel[3];
