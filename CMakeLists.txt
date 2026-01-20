@@ -44,7 +44,7 @@ if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
                      add_library(ZLIB::ZLIB ALIAS zlib)
                 endif()
             endif()
-            # zlib typically adds its source dir to include path for itself, 
+            # zlib typically adds its source dir to include path for itself,
             # but we need to ensure interface includes if it doesn't propagate them nicely in older versions.
             if(TARGET zlib)
                 target_include_directories(zlib INTERFACE 
@@ -95,7 +95,7 @@ endif()
 add_library(microvtk INTERFACE)
 add_library(microvtk::microvtk ALIAS microvtk)
 
-target_include_directories(microvtk INTERFACE 
+target_include_directories(microvtk INTERFACE
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>
 )
@@ -134,7 +134,7 @@ endfunction()
 # Testing
 if(MICROVTK_BUILD_TESTS)
     enable_testing()
-    
+
     # Check if GTest is already available (e.g. from parent)
     if(NOT TARGET GTest::gtest)
         set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
@@ -147,7 +147,7 @@ if(MICROVTK_BUILD_TESTS)
     endif()
 
     if(MICROVTK_BUILD_TESTS)
-        add_executable(unit_tests 
+        add_executable(unit_tests
             tests/test_main.cpp
             tests/test_types.cpp
             tests/test_xml_utils.cpp

@@ -3,7 +3,7 @@
 ## 1. Role & Objective
 You are a Senior C++ Systems Engineer specializing in High-Performance Computing (HPC) and Visualization.
 **Your Goal:** Implement `MicroVTK`, a lightweight, header-only, modern C++20 library for writing VTK files (`.vtu`, `.pvd`).
-**Constraints:** 
+**Constraints:**
 - Strict C++20 standard (Concepts, Spans, Ranges, `std::format`).
 - **Zero-Dependency** for the core library (no external XML or Compression libs).
 - **True Zero-Copy** streaming architecture using Type Erasure (`DataAccessor`).
@@ -37,7 +37,7 @@ microvtk/
 ├── include/
 │   └── microvtk/
 │       ├── common/         # Enums, Concepts, Traits
-│       ├── core/           
+│       ├── core/
 │       │   ├── binary_utils.hpp   # Endianness, Base64
 │       │   ├── data_accessor.hpp # Type-erased data streaming (Zero-copy)
 │       │   └── xml_utils.hpp     # std::format based XML builder
@@ -53,7 +53,7 @@ microvtk/
 ### 3.2 Key Design Decisions
 
 1. **File Format:** Focus on **XML UnstructuredGrid (.vtu)** using **Appended Mode**.
-2. **Streaming Write (Zero-Copy):** 
+2. **Streaming Write (Zero-Copy):**
     - The library does **not** buffer binary data in memory.
     - It uses `core::DataAccessor` to store references to user containers.
     - Data is streamed directly from user memory to disk during the `write()` call.
@@ -112,7 +112,7 @@ writer.setCells(conn, offsets, types);
 // 4. Attributes (AoS supported)
 struct Particle { double mass; };
 std::vector<Particle> parts = ...;
-writer.addPointData("Mass", adapt(parts, &Particle::mass)); 
+writer.addPointData("Mass", adapt(parts, &Particle::mass));
 
 // 5. Write to disk (Direct stream from 'points', 'conn', etc.)
 writer.write("output.vtu");

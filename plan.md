@@ -5,14 +5,14 @@ We will adopt a **Layered Architecture**, abstracting from low-level memory oper
 ```mermaid
 graph TD
     UserCode[User Code (Solver / Sim)] --> AdapterLayer[Adapter Layer]
-    
+
     subgraph MicroVTK Library
         direction TB
         AdapterLayer --> DataModel[Data Model Layer]
         DataModel --> LogicLayer[Logic Layer]
         LogicLayer --> IOBackend[I/O Backend (Physical I/O)]
     end
-    
+
     IOBackend --> Disk[(Disk Files .vtu / .pvd)]
 ```
 

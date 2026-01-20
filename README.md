@@ -7,7 +7,7 @@ A lightweight, high-performance, header-only C++20 library for writing VTK XML f
 - **Modern C++20**: Built with concepts, spans, ranges, and `std::format`.
 - **Streaming Zero-Copy**: True memory-to-disk streaming architecture. Data is referenced via type-erased `DataAccessor` and written directly to the file stream, minimizing peak memory usage.
 - **Compression Support**: Built-in support for **ZLib** and **LZ4** compression schemes for efficient storage.
-- **High Performance**: 
+- **High Performance**:
     - effective ingestion throughput exceeding **600 TiB/s** (O(1) pointer registration).
     - Disk-bound write speeds (measured ~1.6 GiB/s on standard I/O).
 - **Header-Only**: Easy integration. Linkable via modern CMake `microvtk::microvtk`.
@@ -17,7 +17,7 @@ A lightweight, high-performance, header-only C++20 library for writing VTK XML f
 
 - **Compiler**: GCC 13+, Clang 16+, or MSVC 19.30+.
 - **Build System**: CMake 3.25+.
-- **Dependencies (for dev/test)**: 
+- **Dependencies (for dev/test)**:
     - ZLIB & LZ4 (Optional, included via Git submodules for standalone builds).
     - GoogleTest & Google Benchmark (Included via Git submodules).
 

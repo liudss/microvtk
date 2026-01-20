@@ -84,9 +84,7 @@ public:
     }
   };
 
-  ScopedElement scopedElement(std::string_view name) {
-    return {*this, name};
-  }
+  ScopedElement scopedElement(std::string_view name) { return {*this, name}; }
 
 private:
   void indent() {
