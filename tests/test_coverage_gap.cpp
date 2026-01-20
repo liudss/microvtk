@@ -19,7 +19,7 @@ TEST(DataAccessor, NonContiguousContainer) {
   EXPECT_EQ(output.size(), 5 * sizeof(int32_t));
 
   // Check values (Little Endian assumed for this test environment)
-  const int32_t* ptr = reinterpret_cast<const int32_t*>(output.data());
+  const auto* ptr = reinterpret_cast<const int32_t*>(output.data());
   EXPECT_EQ(ptr[0], 1);
   EXPECT_EQ(ptr[1], 2);
   EXPECT_EQ(ptr[2], 3);
@@ -36,7 +36,7 @@ TEST(DataAccessor, LegacyWriteTo) {
   accessor.write_to(buffer);
 
   EXPECT_EQ(buffer.size(), 2 * sizeof(int32_t));
-  const int32_t* ptr = reinterpret_cast<const int32_t*>(buffer.data());
+  const auto* ptr = reinterpret_cast<const int32_t*>(buffer.data());
   EXPECT_EQ(ptr[0], 10);
   EXPECT_EQ(ptr[1], 20);
 }

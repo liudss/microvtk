@@ -63,66 +63,69 @@ public:
 
   // 5. Write to file
   void write(std::string_view filename) {
-    // Phase 1: Compression Pre-pass (if enabled)
-    // We must compress everything to know offsets.
-    std::vector<std::vector<uint8_t>> compressedBuffers;
-    std::vector<uint64_t> originalSizes;
-
     bool usingCompression = (compressionType_ != core::CompressionType::None);
     auto compressor = core::createCompressor(compressionType_);
 
     if (usingCompression && !compressor) {
-      // Fallback or warning if requested compressor is not available?
-      // For now, let's just silently disable compression or throw.
-      // Let's disable and proceed uncompressed to be safe.
       usingCompression = false;
     }
 
+    std::vector<std::vector<uint8_t>> compressedBuffers;
+    std::vector<uint64_t> originalSizes;
+
     if (usingCompression) {
-      // Reset offsets for compressed layout
-      uint64_t runningOffset = 0;
-
-      // Re-calculate offsets for all blocks
-      auto processBlock = [&](DataBlockInfo& info, size_t index) {
-        if (!info.valid) return;
-
-        auto& accessor = accessors_[index];
-        std::vector<uint8_t> tempRaw;
-        // TODO: DataAccessor should have a better way to get raw data
-        // For now, write to a temp vector
-        accessor->write_to(tempRaw);
-
-        originalSizes.push_back(tempRaw.size());
-
-        auto compressed = compressor->compress(tempRaw);
-        compressedBuffers.push_back(std::move(compressed));
-
-        info.offset = runningOffset;
-
-        // Header overhead: #blocks(1) + BlockSize(1) + LastBlockSize(1) +
-        // CompressedSize(1) = 4 * 8 bytes = 32 bytes
-        uint64_t headerSize = 4 * sizeof(uint64_t);
-        runningOffset += headerSize + compressedBuffers.back().size();
-      };
-
-      // Note: The order must match the write order below!
-      // Points
-      processBlock(pointsBlock_, 0);
-      // Cells
-      processBlock(cellsConnBlock_, 1);
-      processBlock(cellsOffsetsBlock_, 2);
-      processBlock(cellsTypesBlock_, 3);
-
-      // Attributes
-      size_t idx = 4;
-      for (auto& block : pointDataBlocks_) processBlock(block, idx++);
-      for (auto& block : cellDataBlocks_) processBlock(block, idx++);
+      prepareCompression(compressor, compressedBuffers, originalSizes);
     }
 
     std::ofstream ofs(std::string(filename), std::ios::binary);
-    core::XmlBuilder xml(ofs);
+    writeXmlStructure(ofs, usingCompression);
+    writeAppendedData(ofs, usingCompression, compressedBuffers, originalSizes);
 
-    // Header
+    ofs << "</VTKFile>";
+  }
+
+private:
+  struct DataBlockInfo {
+    std::string name;
+    uint64_t offset;
+    std::string typeName;
+    int numComponents;
+    bool valid = false;
+  };
+
+  void prepareCompression(const std::unique_ptr<core::Compressor>& compressor,
+                          std::vector<std::vector<uint8_t>>& compressedBuffers,
+                          std::vector<uint64_t>& originalSizes) {
+    uint64_t runningOffset = 0;
+
+    auto processBlock = [&](DataBlockInfo& info, size_t index) {
+      if (!info.valid) return;
+
+      auto& accessor = accessors_[index];
+      std::vector<uint8_t> tempRaw;
+      accessor->write_to(tempRaw);
+
+      originalSizes.push_back(tempRaw.size());
+      auto compressed = compressor->compress(tempRaw);
+      compressedBuffers.push_back(std::move(compressed));
+
+      info.offset = runningOffset;
+      uint64_t headerSize = 4 * sizeof(uint64_t);
+      runningOffset += headerSize + compressedBuffers.back().size();
+    };
+
+    processBlock(pointsBlock_, 0);
+    processBlock(cellsConnBlock_, 1);
+    processBlock(cellsOffsetsBlock_, 2);
+    processBlock(cellsTypesBlock_, 3);
+
+    size_t idx = 4;
+    for (auto& block : pointDataBlocks_) processBlock(block, idx++);
+    for (auto& block : cellDataBlocks_) processBlock(block, idx++);
+  }
+
+  void writeXmlStructure(std::ostream& ofs, bool usingCompression) {
+    core::XmlBuilder xml(ofs);
     xml.startElement("VTKFile");
     xml.attribute("type", "UnstructuredGrid");
     xml.attribute("version", "1.0");
@@ -143,13 +146,11 @@ public:
         piece.attr("NumberOfPoints", numberOfPoints_);
         piece.attr("NumberOfCells", numberOfCells_);
 
-        // <Points>
         {
           auto p = xml.scopedElement("Points");
           writeArrayHeader(xml, pointsBlock_);
         }
 
-        // <Cells>
         {
           auto c = xml.scopedElement("Cells");
           writeArrayHeader(xml, cellsConnBlock_);
@@ -157,62 +158,45 @@ public:
           writeArrayHeader(xml, cellsTypesBlock_);
         }
 
-        // <PointData>
         if (!pointDataBlocks_.empty()) {
           auto pd = xml.scopedElement("PointData");
-          for (const auto& block : pointDataBlocks_) {
+          for (const auto& block : pointDataBlocks_)
             writeArrayHeader(xml, block);
-          }
         }
 
-        // <CellData>
         if (!cellDataBlocks_.empty()) {
           auto cd = xml.scopedElement("CellData");
-          for (const auto& block : cellDataBlocks_) {
+          for (const auto& block : cellDataBlocks_)
             writeArrayHeader(xml, block);
-          }
         }
       }
     }
 
-    // <AppendedData>
     xml.startElement("AppendedData");
     xml.attribute("encoding", "raw");
     xml.writeRaw(">_");
+  }
 
+  void writeAppendedData(
+      std::ostream& ofs, bool usingCompression,
+      const std::vector<std::vector<uint8_t>>& compressedBuffers,
+      const std::vector<uint64_t>& originalSizes) {
     if (usingCompression) {
-      // Write Compressed Data
-      // Order must match the processBlock order above
       size_t bufIdx = 0;
-
       auto writeCompressedBlock = [&](size_t origSize) {
         const auto& compressed = compressedBuffers[bufIdx];
-
-        // VTK Compressed Header (for 1 block)
-        // [NumberOfBlocks][BlockSize][LastBlockSize][CompressedBlockSize]
         std::vector<uint64_t> header = {
             1, static_cast<uint64_t>(origSize), static_cast<uint64_t>(origSize),
             static_cast<uint64_t>(compressed.size())};
 
         for (auto val : header) {
-          core::write_le(val,
-                         compressedBuffers[bufIdx]);  // Hack: append header to
-                                                      // the buffer temporarily?
-          // No, just write to stream
-          // Actually core::write_le takes a vector. Let's make a small buffer.
-        }
-
-        // Directly write header to stream
-        for (auto val : header) {
           std::vector<uint8_t> tmp;
           core::write_le(val, tmp);
-          ofs.write(reinterpret_cast<const char*>(tmp.data()), tmp.size());
+          ofs.write(reinterpret_cast<const char*>(tmp.data()),
+                    static_cast<std::streamsize>(tmp.size()));
         }
-
-        // Write Data
         ofs.write(reinterpret_cast<const char*>(compressed.data()),
-                  compressed.size());
-
+                  static_cast<std::streamsize>(compressed.size()));
         bufIdx++;
       };
 
@@ -224,32 +208,19 @@ public:
         if (b.valid) writeCompressedBlock(originalSizes[bufIdx]);
       for (const auto& b : cellDataBlocks_)
         if (b.valid) writeCompressedBlock(originalSizes[bufIdx]);
-
     } else {
-      // Streaming Mode (Zero Copy)
       for (const auto& accessor : accessors_) {
         uint64_t dataSize = accessor->size_bytes();
         std::vector<uint8_t> headerBuf;
         headerBuf.reserve(8);
         core::write_le(dataSize, headerBuf);
         ofs.write(reinterpret_cast<const char*>(headerBuf.data()),
-                  headerBuf.size());
+                  static_cast<std::streamsize>(headerBuf.size()));
         accessor->write_to_stream(ofs);
       }
     }
-
     ofs << "</AppendedData>\n";
-    ofs << "</VTKFile>";
   }
-
-private:
-  struct DataBlockInfo {
-    std::string name;
-    uint64_t offset;
-    std::string typeName;
-    int numComponents;
-    bool valid = false;
-  };
 
   template <std::ranges::range R>
   DataBlockInfo registerData(const R& data, std::string_view name,
@@ -258,20 +229,14 @@ private:
 
     DataBlockInfo info;
     info.name = name;
-    // Current virtual offset (assuming uncompressed, will be overwritten if
-    // compressed)
     info.offset = currentOffset_;
     info.typeName = vtkTypeName<std::remove_const_t<T>>();
     info.numComponents = numComponents;
     info.valid = true;
 
     auto accessor = std::make_unique<core::RangeAccessor<R>>(data);
-
-    // Calculate size: Header (8 bytes) + Data Bytes (Uncompressed)
-    // This is the default assumption.
     uint64_t payloadSize = accessor->size_bytes();
     currentOffset_ += sizeof(uint64_t) + payloadSize;
-
     accessors_.push_back(std::move(accessor));
 
     return info;
@@ -289,7 +254,6 @@ private:
     xml.endElement();
   }
 
-  // Replaces appendedData_
   std::vector<std::unique_ptr<core::DataAccessor>> accessors_;
   uint64_t currentOffset_ = 0;
   core::CompressionType compressionType_ = core::CompressionType::None;

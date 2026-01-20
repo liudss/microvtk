@@ -47,11 +47,11 @@ if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
             # zlib typically adds its source dir to include path for itself,
             # but we need to ensure interface includes if it doesn't propagate them nicely in older versions.
             if(TARGET zlib)
-                target_include_directories(zlib INTERFACE 
+                target_include_directories(zlib INTERFACE
                     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/external/zlib>
                 )
             elseif(TARGET zlibstatic)
-                target_include_directories(zlibstatic INTERFACE 
+                target_include_directories(zlibstatic INTERFACE
                     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/external/zlib>
                 )
             endif()

@@ -23,7 +23,8 @@ struct Particle {
 };
 
 TEST(Adapter, AdaptAoS) {
-  std::vector<Particle> particles = {{1.0, 10}, {2.0, 20}};
+  std::vector<Particle> particles = {{.mass = 1.0, .id = 10},
+                                     {.mass = 2.0, .id = 20}};
 
   // Adapt mass
   auto masses = adapt(particles, &Particle::mass);
