@@ -205,3 +205,18 @@ if(MICROVTK_BUILD_BENCHMARKS)
         microvtk_set_strict_warnings(bench_formatting)
     endif()
 endif()
+
+# IDE/LSP Support: Force compilation of headers to generate compile_commands.json entries
+# This target is always defined to ensure compile_commands.json includes headers
+# whenever CMAKE_EXPORT_COMPILE_COMMANDS is ON (which it is in our presets).
+file(GLOB_RECURSE MICROVTK_HEADERS "${CMAKE_CURRENT_SOURCE_DIR}/include/*.hpp")
+# Force CMake to treat headers as C++ source files for compilation database generation
+set_source_files_properties(${MICROVTK_HEADERS} PROPERTIES LANGUAGE CXX)
+
+# Using OBJECT library prevents actual linking/archiving overhead,
+# but still runs the compiler front-end which generates the commands.
+add_library(microvtk_ide_headers OBJECT ${MICROVTK_HEADERS})
+target_link_libraries(microvtk_ide_headers PRIVATE microvtk)
+set_target_properties(microvtk_ide_headers PROPERTIES LINKER_LANGUAGE CXX)
+# Ensure it doesn't get built by default 'all' target
+set_target_properties(microvtk_ide_headers PROPERTIES EXCLUDE_FROM_ALL ON)
