@@ -18,6 +18,7 @@ static void BM_Stream_Attributes(benchmark::State& state) {
   std::stringstream ss;
 
   for (auto _ : state) {
+    (void)_;
     ss.str("");  // clear buffer
     ss << "<DataArray";
     ss << " type=\"" << type << "\"";
@@ -41,6 +42,7 @@ static void BM_Format_Attributes(benchmark::State& state) {
   buffer.reserve(256);
 
   for (auto _ : state) {
+    (void)_;
     buffer.clear();
     std::format_to(
         std::back_inserter(buffer),
@@ -56,6 +58,7 @@ static void BM_Stream_Int(benchmark::State& state) {
   int val = 123456789;
   std::stringstream ss;
   for (auto _ : state) {
+    (void)_;
     ss.str("");
     ss << val;
     benchmark::DoNotOptimize(ss.str());
@@ -67,6 +70,7 @@ static void BM_Format_Int(benchmark::State& state) {
   int val = 123456789;
   std::string buffer;
   for (auto _ : state) {
+    (void)_;
     buffer.clear();
     std::format_to(std::back_inserter(buffer), "{}", val);
     benchmark::DoNotOptimize(buffer);
@@ -84,8 +88,9 @@ static void BM_Format_Attributes_Optimized(benchmark::State& state) {
   buffer.resize(256);  // Pre-allocate size
 
   for (auto _ : state) {
+    (void)_;
     auto res = std::format_to_n(
-        buffer.data(), buffer.size(),
+        buffer.begin(), std::ssize(buffer),
         R"(<DataArray type="{}" Name="{}" NumberOfComponents="{}" format="appended" offset="{}"/>)",
         type, name, components, offset);
     benchmark::DoNotOptimize(res);
