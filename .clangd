@@ -1,0 +1,12 @@
+CompileFlags:
+  CompilationDatabase: .
+
+Index:
+  Background: Build
+
+Diagnostics:
+  ClangTidy:
+    # Clangd respects .clang-tidy files, so we don't need to duplicate checks here.
+    # We can add global suppressions or additions if needed, but for now we rely on the project config.
+    Add: []
+    Remove: []
