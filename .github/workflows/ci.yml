@@ -9,11 +9,11 @@ on:
 jobs:
   build-linux:
     name: Linux (${{ matrix.compiler }}, ${{ matrix.build_type }})
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
-        compiler: [gcc-13, clang-16]
+        compiler: [gcc, clang]
         build_type: [debug, release]
 
     steps:
@@ -26,23 +26,15 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y ninja-build
 
-    - name: Install GCC 13
-      if: matrix.compiler == 'gcc-13'
+    - name: Setup Compiler Environment
       run: |
-        sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
-        sudo apt-get update
-        sudo apt-get install -y g++-13
-        echo "CC=gcc-13" >> $GITHUB_ENV
-        echo "CXX=g++-13" >> $GITHUB_ENV
-
-    - name: Install Clang 16
-      if: matrix.compiler == 'clang-16'
-      run: |
-        wget https://apt.llvm.org/llvm.sh
-        chmod +x llvm.sh
-        sudo ./llvm.sh 16
-        echo "CC=clang-16" >> $GITHUB_ENV
-        echo "CXX=clang++-16" >> $GITHUB_ENV
+        if [ "${{ matrix.compiler }}" = "gcc" ]; then
+          echo "CC=gcc" >> $GITHUB_ENV
+          echo "CXX=g++" >> $GITHUB_ENV
+        else
+          echo "CC=clang" >> $GITHUB_ENV
+          echo "CXX=clang++" >> $GITHUB_ENV
+        fi
 
     - name: Configure CMake
       run: cmake --preset ${{ matrix.build_type }}
