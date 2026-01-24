@@ -1,98 +1,162 @@
 # MicroVTK
 
-A lightweight, high-performance, header-only C++20 library for writing VTK XML files (`.vtu`, `.pvd`) with a streaming zero-copy architecture.
+![Language](https://img.shields.io/badge/language-C%2B%2B20-blue.svg)
+![License](https://img.shields.io/badge/license-MIT-green.svg)
+![Build](https://img.shields.io/badge/build-passing-brightgreen.svg)
 
-## Key Features
+**MicroVTK** is a lightweight, high-performance, header-only C++20 library designed for writing VTK XML files (`.vtu`, `.pvd`) in scientific simulations.
 
-- **Modern C++20**: Built with concepts, spans, ranges, and `std::format`.
-- **Streaming Zero-Copy**: True memory-to-disk streaming architecture. Data is referenced via type-erased `DataAccessor` and written directly to the file stream, minimizing peak memory usage.
-- **Compression Support**: Built-in support for **ZLib** and **LZ4** compression schemes for efficient storage.
-- **High Performance**:
-    - effective ingestion throughput exceeding **600 TiB/s** (O(1) pointer registration).
-    - Disk-bound write speeds (measured ~1.6 GiB/s on standard I/O).
-- **Header-Only**: Easy integration. Linkable via modern CMake `microvtk::microvtk`.
-- **Robustness**: Includes size validation for topology arrays and exhaustive unit tests (>90% coverage).
+It features a **true zero-copy streaming architecture**, meaning it streams data directly from your memory structures to disk without intermediate buffering, minimizing memory footprint and maximizing I/O throughput.
 
-## Requirements
+## ✨ Key Features
 
-- **Compiler**: GCC 13+, Clang 16+, or MSVC 19.30+.
-- **Build System**: CMake 3.25+.
-- **Dependencies (for dev/test)**:
-    - ZLIB & LZ4 (Optional, included via Git submodules for standalone builds).
-    - GoogleTest & Google Benchmark (Included via Git submodules).
+- **Modern C++20**: Built from the ground up using Concepts, Ranges, Spans, and `std::format`.
+- **Zero-Copy Streaming**: Data is referenced via type-erased accessors and streamed directly to disk. Ideal for handling massive datasets where memory is scarce.
+- **Zero-Dependency Core**: The core library depends only on the C++ Standard Library.
+- **Compression Support**: Optional, seamless integration with **ZLIB** and **LZ4** for efficient disk usage.
+- **Flexible Adapters**: Built-in support for Array-of-Structures (AoS) and strided data layouts via `vtk::adapt`.
+- **Time Series Support**: Native support for `.pvd` files to manage time-dependent simulations.
+- **High Performance**: Optimized for the "Appended Binary" VTK format, achieving disk-bound write speeds.
 
-## Integration
+## 📦 Integration
 
-### Via CMake (Recommended)
+### CMake (Recommended)
 
-Add MicroVTK as a submodule:
-```bash
-git submodule add https://github.com/liudss/microvtk.git external/microvtk
-```
+MicroVTK is designed to be easily integrated as a CMake submodule.
 
-Then in your `CMakeLists.txt`:
+1.  **Add as a submodule**:
+    ```bash
+    git submodule add https://github.com/liudss/microvtk.git external/microvtk
+    ```
+
+2.  **Update `CMakeLists.txt`**:
+    ```cmake
+    add_subdirectory(external/microvtk)
+    target_link_libraries(your_target PRIVATE microvtk::microvtk)
+    ```
+
+### Compression Options
+
+By default, MicroVTK looks for ZLIB and LZ4. You can control this via CMake options before adding the subdirectory:
+
 ```cmake
+set(MICROVTK_USE_ZLIB ON) # or OFF
+set(MICROVTK_USE_LZ4 ON)  # or OFF
 add_subdirectory(external/microvtk)
-target_link_libraries(your_app PRIVATE microvtk::microvtk)
 ```
 
-## Quick Start
+## 🚀 Usage Examples
 
-### Basic VTU Writing (Streaming Mode)
+### 1. Basic VTU Writer (Unstructured Grid)
 
 ```cpp
 #include <microvtk/microvtk.hpp>
 #include <vector>
 
-using namespace microvtk;
-
 int main() {
+    using namespace microvtk;
+
     VtuWriter writer;
 
-    // Data is referenced (not copied) until writer.write() is called
-    std::vector<double> points = {0,0,0, 1,0,0, 0,1,0};
+    // 1. Set Geometry (Zero-copy references)
+    // Data must remain valid until writer.write() is called
+    std::vector<double> points = {
+        0.0, 0.0, 0.0,
+        1.0, 0.0, 0.0,
+        0.0, 1.0, 0.0
+    };
     writer.setPoints(points);
 
-    std::vector<int32_t> conn = {0, 1, 2}, offsets = {3};
+    // 2. Set Topology
+    std::vector<int32_t> conn = {0, 1, 2};
+    std::vector<int32_t> offsets = {3};
     std::vector<uint8_t> types = {static_cast<uint8_t>(CellType::Triangle)};
     writer.setCells(conn, offsets, types);
 
-    writer.write("output.vtu");
-    return 0;
+    // 3. Add Data Attributes
+    std::vector<double> temperature = {298.15, 300.0, 310.5};
+    writer.addPointData("Temperature", temperature);
+
+    // 4. Write to Disk
+    // By default, uses Appended Binary mode (Little Endian)
+    writer.write("simulation_step.vtu");
 }
 ```
 
-### Compression
+### 2. Handling Array-of-Structures (AoS)
+
+Use `vtk::adapt` to write data directly from your custom structs without manual copying.
 
 ```cpp
-writer.setCompression(core::CompressionType::LZ4);
+struct Particle {
+    double x, y, z;
+    double mass;
+    double velocity[3];
+};
+
+std::vector<Particle> particles = ...;
+
+// Write 'mass' directly from the struct vector
+writer.addPointData("Mass", vtk::adapt(particles, &Particle::mass));
+
+// Write 'velocity' (3 components)
+writer.addPointData("Velocity", vtk::adapt(particles, &Particle::velocity));
+```
+
+### 3. Time Series (.pvd)
+
+```cpp
+PvdWriter pvd("output/simulation.pvd");
+
+for (int step = 0; step < 100; ++step) {
+    std::string filename = std::format("step_{}.vtu", step);
+    
+    // ... write vtu file ...
+    
+    // Register step in PVD file
+    pvd.addStep(step * 0.01, filename);
+    
+    // Explicit save allows updating the PVD file during the simulation
+    pvd.save(); 
+}
+```
+
+### 4. Enabling Compression
+
+```cpp
+// Set compression mode before writing
+writer.setCompression(core::CompressionType::LZ4); 
 writer.write("compressed_output.vtu");
 ```
 
-### Time-Series (PVD)
+## 🛠 Building the Project
 
-```cpp
-PvdWriter pvd("simulation.pvd");
-pvd.addStep(0.0, "step_0.vtu");
-pvd.addStep(0.1, "step_1.vtu");
-pvd.save(); // Explicit save for performance in loops
+To build the tests and benchmarks included in this repository:
+
+```bash
+mkdir build && cd build
+cmake -G Ninja -D MICROVTK_BUILD_TESTS=ON -D MICROVTK_BUILD_BENCHMARKS=ON ..
+cmake --build .
 ```
 
-## Benchmarks
+**Run Tests:**
+```bash
+./unit_tests
+```
 
-MicroVTK is designed for extreme performance in simulation contexts:
-- **Registration**: O(1) pointer-based data registration.
-- **Writing**: Efficiently handles millions of points with minimal CPU overhead.
-- **LZ4**: Often results in *faster* wall-clock write times than uncompressed I/O due to reduced data volume.
+## 📂 Project Structure
 
-## Acknowledgments
+```text
+microvtk/
+├── include/microvtk/   # Header files
+│   ├── common/         # Enums, Concepts
+│   ├── core/           # Data Accessors, XML Utils, Binary Utils
+│   └── ...             # Writer implementations
+├── examples/           # Usage examples
+├── tests/              # Unit tests (GoogleTest)
+└── benchmarks/         # Performance benchmarks (Google Benchmark)
+```
 
-MicroVTK utilizes the following excellent open-source libraries for its optional compression and testing features:
+## 📜 License
 
-- **[ZLIB](https://zlib.net/)**: A massive thank you to Jean-loup Gailly and Mark Adler for providing the gold standard of compression.
-- **[LZ4](https://lz4.org/)**: Thanks to Yann Collet for the extremely fast compression algorithm that enables high-performance visualization.
-- **[GoogleTest](https://github.com/google/googletest)** and **[Google Benchmark](https://github.com/google/benchmark)** for the robust testing and performance measurement infrastructure.
-
-## License
-
-MIT License
+This project is licensed under the **MIT License**.
