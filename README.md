@@ -2,13 +2,13 @@
 
 ![Language](https://img.shields.io/badge/language-C%2B%2B20-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
-![Build](https://img.shields.io/badge/build-passing-brightgreen.svg)
+[![CI](https://github.com/liudss/microvtk/actions/workflows/ci.yml/badge.svg)](https://github.com/liudss/microvtk/actions/workflows/ci.yml)
 
 **MicroVTK** is a lightweight, high-performance, header-only C++20 library designed for writing VTK XML files (`.vtu`, `.pvd`) in scientific simulations.
 
 It features a **true zero-copy streaming architecture**, meaning it streams data directly from your memory structures to disk without intermediate buffering, minimizing memory footprint and maximizing I/O throughput.
 
-## ✨ Key Features
+## Key Features
 
 - **Modern C++20**: Built from the ground up using Concepts, Ranges, Spans, and `std::format`.
 - **Zero-Copy Streaming**: Data is referenced via type-erased accessors and streamed directly to disk. Ideal for handling massive datasets where memory is scarce.
@@ -18,7 +18,7 @@ It features a **true zero-copy streaming architecture**, meaning it streams data
 - **Time Series Support**: Native support for `.pvd` files to manage time-dependent simulations.
 - **High Performance**: Optimized for the "Appended Binary" VTK format, achieving disk-bound write speeds.
 
-## 📦 Integration
+## Integration
 
 ### CMake (Recommended)
 
@@ -45,7 +45,7 @@ set(MICROVTK_USE_LZ4 ON)  # or OFF
 add_subdirectory(external/microvtk)
 ```
 
-## 🚀 Usage Examples
+## Usage Examples
 
 ### 1. Basic VTU Writer (Unstructured Grid)
 
@@ -129,7 +129,7 @@ writer.setCompression(core::CompressionType::LZ4);
 writer.write("compressed_output.vtu");
 ```
 
-## 🛠 Building the Project
+## Building the Project
 
 To build the tests and benchmarks included in this repository:
 
@@ -144,7 +144,7 @@ cmake --build .
 ./unit_tests
 ```
 
-## 📂 Project Structure
+## Project Structure
 
 ```text
 microvtk/
@@ -157,6 +157,6 @@ microvtk/
 └── benchmarks/         # Performance benchmarks (Google Benchmark)
 ```
 
-## 📜 License
+## License
 
 This project is licensed under the **MIT License**.
