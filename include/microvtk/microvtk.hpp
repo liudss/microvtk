@@ -9,6 +9,8 @@
 
 // Adapters
 #include <microvtk/adapter.hpp>
+#include <microvtk/cabana_adapter.hpp>
+#include <microvtk/kokkos_adapter.hpp>
 
 // Writers
 #include <microvtk/pvd_writer.hpp>

@@ -15,6 +15,7 @@ It features a **true zero-copy streaming architecture**, meaning it streams data
 - **Zero-Dependency Core**: The core library depends only on the C++ Standard Library.
 - **Compression Support**: Optional, seamless integration with **ZLIB** and **LZ4** for efficient disk usage.
 - **Flexible Adapters**: Built-in support for Array-of-Structures (AoS) and strided data layouts via `vtk::adapt`.
+- **HPC Ecosystem Support**: Native adapters for **Kokkos Views** and **Cabana Slices** for seamless integration into large-scale HPC simulations.
 - **Time Series Support**: Native support for `.pvd` files to manage time-dependent simulations.
 - **High Performance**: Optimized for the "Appended Binary" VTK format, achieving disk-bound write speeds.
 
@@ -35,13 +36,20 @@ MicroVTK is designed to be easily integrated as a CMake submodule.
     target_link_libraries(your_target PRIVATE microvtk::microvtk)
     ```
 
-### Compression Options
+### Optional Dependencies
 
-By default, MicroVTK looks for ZLIB and LZ4. You can control this via CMake options before adding the subdirectory:
+You can control feature support via CMake options:
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `MICROVTK_USE_ZLIB` | Enable ZLIB compression | ON |
+| `MICROVTK_USE_LZ4` | Enable LZ4 compression | ON |
+| `MICROVTK_USE_KOKKOS` | Enable Kokkos View adapter | OFF |
+| `MICROVTK_USE_CABANA` | Enable Cabana Slice adapter | OFF |
 
 ```cmake
-set(MICROVTK_USE_ZLIB ON) # or OFF
-set(MICROVTK_USE_LZ4 ON)  # or OFF
+set(MICROVTK_USE_KOKKOS ON)
+set(MICROVTK_USE_CABANA ON)
 add_subdirectory(external/microvtk)
 ```
 
@@ -89,7 +97,6 @@ Use `vtk::adapt` to write data directly from your custom structs without manual 
 
 ```cpp
 struct Particle {
-    double x, y, z;
     double mass;
     double velocity[3];
 };
@@ -97,35 +104,59 @@ struct Particle {
 std::vector<Particle> particles = ...;
 
 // Write 'mass' directly from the struct vector
-writer.addPointData("Mass", vtk::adapt(particles, &Particle::mass));
+writer.addPointData("Mass", microvtk::adapt(particles, &Particle::mass));
 
 // Write 'velocity' (3 components)
-writer.addPointData("Velocity", vtk::adapt(particles, &Particle::velocity));
+writer.addPointData("Velocity", microvtk::adapt(particles, &Particle::velocity), 3);
 ```
 
-### 3. Time Series (.pvd)
+### 3. HPC Adapters (Kokkos & Cabana)
+
+MicroVTK provides specialized adapters for high-performance computing frameworks.
+
+#### Kokkos View
+Directly write from `Kokkos::View` (must be accessible from `HostSpace`).
+```cpp
+Kokkos::View<double*[3], Kokkos::LayoutRight, Kokkos::HostSpace> points("pts", N);
+// ... fill points ...
+
+writer.setPoints(microvtk::adapt(points));
+```
+
+#### Cabana AoSoA
+Write flattened data from Cabana slices. It automatically handles the conversion from AoSoA layouts to the flat scalar ranges required by VTK.
+```cpp
+using MemberTypes = Cabana::MemberTypes<double[3], double>;
+Cabana::AoSoA<MemberTypes, Kokkos::HostSpace> aosoa("data", N);
+auto pos_slice = Cabana::slice<0>(aosoa);
+
+// Automatically flattens the N x [3] slice into a flat 3N range
+writer.setPoints(microvtk::adapt(pos_slice));
+```
+
+### 4. Time Series (.pvd)
 
 ```cpp
 PvdWriter pvd("output/simulation.pvd");
 
 for (int step = 0; step < 100; ++step) {
     std::string filename = std::format("step_{}.vtu", step);
-    
+
     // ... write vtu file ...
-    
+
     // Register step in PVD file
     pvd.addStep(step * 0.01, filename);
-    
+
     // Explicit save allows updating the PVD file during the simulation
-    pvd.save(); 
+    pvd.save();
 }
 ```
 
-### 4. Enabling Compression
+### 5. Enabling Compression
 
 ```cpp
 // Set compression mode before writing
-writer.setCompression(core::CompressionType::LZ4); 
+writer.setCompression(core::CompressionType::LZ4);
 writer.write("compressed_output.vtu");
 ```
 

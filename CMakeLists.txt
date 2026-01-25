@@ -12,6 +12,8 @@ option(MICROVTK_BUILD_EXAMPLES "Build examples" OFF)
 option(MICROVTK_BUILD_BENCHMARKS "Build benchmarks" OFF)
 option(MICROVTK_USE_ZLIB "Enable ZLib compression support" ON)
 option(MICROVTK_USE_LZ4 "Enable LZ4 compression support" ON)
+option(MICROVTK_USE_KOKKOS "Enable Kokkos adapter support" OFF)
+option(MICROVTK_USE_CABANA "Enable Cabana adapter support" OFF)
 
 # Default to ON if top-level project
 if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
@@ -73,6 +75,33 @@ if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
         endif()
     endif()
 
+    # Kokkos
+    if(MICROVTK_USE_KOKKOS)
+        if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/external/kokkos/CMakeLists.txt")
+            set(Kokkos_ENABLE_TESTS OFF CACHE BOOL "" FORCE)
+            set(Kokkos_ENABLE_EXAMPLES OFF CACHE BOOL "" FORCE)
+            set(Kokkos_ENABLE_IMPL_VIEW_LEGACY ON CACHE BOOL "" FORCE) # Required for Cabana
+            add_subdirectory(external/kokkos)
+        else()
+            message(FATAL_ERROR "Kokkos enabled but external/kokkos not found. Did you run 'git submodule update --init'?")
+        endif()
+    endif()
+
+    # Cabana
+    if(MICROVTK_USE_CABANA)
+        if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/external/cabana/CMakeLists.txt")
+            set(Cabana_ENABLE_TESTING OFF CACHE BOOL "" FORCE)
+            set(Cabana_ENABLE_EXAMPLES OFF CACHE BOOL "" FORCE)
+
+            # Allow Cabana to find our internal Kokkos target via cmake/FindKokkos.cmake
+            list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+
+            add_subdirectory(external/cabana)
+        else()
+             message(FATAL_ERROR "Cabana enabled but external/cabana not found. Did you run 'git submodule update --init'?")
+        endif()
+    endif()
+
 else()
     # -------------------------------------------------------------------------
     # Library Usage Mode: Use System/User Provided Dependencies
@@ -88,6 +117,14 @@ else()
             find_package(PkgConfig REQUIRED)
             pkg_check_modules(LZ4 REQUIRED liblz4)
         endif()
+    endif()
+
+    if(MICROVTK_USE_KOKKOS)
+        find_package(Kokkos REQUIRED)
+    endif()
+
+    if(MICROVTK_USE_CABANA)
+        find_package(Cabana REQUIRED)
     endif()
 endif()
 
@@ -118,6 +155,16 @@ if(MICROVTK_USE_LZ4)
          target_include_directories(microvtk INTERFACE ${LZ4_INCLUDE_DIRS})
          target_link_libraries(microvtk INTERFACE ${LZ4_LIBRARIES})
     endif()
+endif()
+
+if(MICROVTK_USE_KOKKOS)
+    target_compile_definitions(microvtk INTERFACE MICROVTK_HAS_KOKKOS)
+    target_link_libraries(microvtk INTERFACE Kokkos::kokkos)
+endif()
+
+if(MICROVTK_USE_CABANA)
+    target_compile_definitions(microvtk INTERFACE MICROVTK_HAS_CABANA)
+    target_link_libraries(microvtk INTERFACE Cabana::Core)
 endif()
 
 
@@ -158,6 +205,7 @@ if(MICROVTK_BUILD_TESTS)
             tests/test_vtu_validation.cpp
             tests/test_coverage_gap.cpp
             tests/test_compression.cpp
+            tests/test_adapter_kokkos_cabana.cpp
         )
         microvtk_set_strict_warnings(unit_tests)
         target_link_libraries(unit_tests PRIVATE microvtk GTest::gtest GTest::gtest_main)
@@ -203,6 +251,10 @@ if(MICROVTK_BUILD_BENCHMARKS)
         add_executable(bench_formatting benchmarks/bench_formatting.cpp)
         target_link_libraries(bench_formatting PRIVATE benchmark::benchmark)
         microvtk_set_strict_warnings(bench_formatting)
+
+        add_executable(bench_adapters benchmarks/bench_adapters.cpp)
+        target_link_libraries(bench_adapters PRIVATE microvtk benchmark::benchmark)
+        microvtk_set_strict_warnings(bench_adapters)
     endif()
 endif()
 
