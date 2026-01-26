@@ -20,8 +20,11 @@ You are a Senior C++ Systems Engineer specializing in High-Performance Computing
     * **Google Benchmark:** Git submodule (benchmarking).
     * **ZLIB:** Git submodule (optional, for compression).
     * **LZ4:** Git submodule (optional, for compression).
-* **Tools:** `clang-format` (Google Style), `clang-tidy`, `gcovr` (Coverage).
-* **Testing:** GoogleTest (GTest) via Git Submodule.
+    * **Python (VTK/Pytest):** Managed via **uv** (Integration testing).
+* **Tools:** `clang-format` (Google Style), `clang-tidy`, `uv`.
+* **Testing:**
+    * **C++:** GoogleTest (Unit Tests).
+    * **Python:** pytest + official VTK (Integration Tests).
 
 ---
 
@@ -45,21 +48,13 @@ microvtk/
 │       ├── pvd_writer.hpp  # Time Series Writer (Explicit Save)
 │       ├── adapter.hpp     # Data Adapters (AoS support)
 │       └── microvtk.hpp    # Main entry header
-├── tests/                  # Unit tests (GTest)
+├── tests/
+│   ├── integration/        # Python compatibility tests (Official VTK)
+│   └── ...                 # Unit tests (GTest)
+├── pyproject.toml          # Python dependencies (uv)
 ├── CMakeLists.txt
 └── .clang-format
 ```
-
-### 3.2 Key Design Decisions
-
-1. **File Format:** Focus on **XML UnstructuredGrid (.vtu)** using **Appended Mode**.
-2. **Streaming Write (Zero-Copy):**
-    - The library does **not** buffer binary data in memory.
-    - It uses `core::DataAccessor` to store references to user containers.
-    - Data is streamed directly from user memory to disk during the `write()` call.
-    - **Note:** User must ensure data longevity until `write()` completes.
-3. **XML Generation:** Powered by `std::format` (C++20) for superior performance over `std::stringstream`.
-4. **Endianness:** VTK XML defaults to Little Endian. The library detects host endianness and performs on-the-fly byte swapping during streaming if necessary.
 
 ---
 
@@ -80,13 +75,20 @@ microvtk/
 - Support for multi-step time series.
 - **Explicit Save**: Performance-optimized to avoid redundant I/O during simulation loops.
 
+### Phase 6: Integration Testing (Completed)
+- Automated compatibility verification using official VTK Python library.
+- Dependency management using `uv`.
+- GitHub Actions integration for both Linux and Windows.
+
 ---
 
 ## 5. Coding Standards & Quality Gates
 
 * **Namespace:** `namespace microvtk`.
 * **Safety:** Size validation on topology arrays. `noexcept` specifications on performance-critical adapters.
-* **Testing:** Comprehensive unit tests covering edge cases (Base64 padding, non-contiguous containers).
+* **Testing:**
+    * Comprehensive unit tests covering edge cases.
+    * **Integration Gate**: All generated files must be readable by official VTK bindings.
 * **Coverage:** Target >85% (excluding platform-specific endian logic).
 
 ---
