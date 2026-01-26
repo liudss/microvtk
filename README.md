@@ -170,9 +170,25 @@ cmake -G Ninja -D MICROVTK_BUILD_TESTS=ON -D MICROVTK_BUILD_BENCHMARKS=ON ..
 cmake --build .
 ```
 
-**Run Tests:**
+**Run Unit Tests:**
 ```bash
 ./unit_tests
+```
+
+**Run Integration Tests:**
+Integration tests use Python and the official VTK library to verify compatibility. We recommend using `uv` to manage the environment.
+
+```bash
+# Install uv (if needed)
+# curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Run tests
+uv run pytest
+```
+
+Or via CTest (if `uv` is installed):
+```bash
+ctest -R Integration.Python
 ```
 
 ## Project Structure
