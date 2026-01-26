@@ -212,6 +212,18 @@ if(MICROVTK_BUILD_TESTS)
 
         include(GoogleTest)
         gtest_discover_tests(unit_tests)
+
+        # Integration Tests (Python + VTK)
+        find_program(UV_EXECUTABLE uv)
+        if(UV_EXECUTABLE)
+            add_test(NAME Integration.Python
+                COMMAND ${UV_EXECUTABLE} run pytest
+                WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+            )
+            message(STATUS "MicroVTK: Python integration tests enabled (using uv at ${UV_EXECUTABLE})")
+        else()
+            message(WARNING "MicroVTK: 'uv' not found. Integration tests skipped.")
+        endif()
     endif()
 endif()
 

@@ -1,0 +1,16 @@
+[project]
+name = "microvtk-tests"
+version = "0.1.0"
+description = "Integration tests for MicroVTK using official VTK library"
+requires-python = ">=3.9"
+dependencies = [
+    "vtk>=9.0.0",
+    "pytest>=7.0.0"
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests/integration"]
+python_files = "test_*.py"
+markers = [
+    "integration: mark a test as an integration test."
+]

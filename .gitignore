@@ -8,3 +8,8 @@ out/
 CMakeUserPresets.json
 compile_commands.json
 .DS_Store
+
+# Python
+.venv/
+__pycache__/
+*.vtu
