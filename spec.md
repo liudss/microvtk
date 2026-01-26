@@ -1,0 +1,90 @@
+# MicroVTK Specification
+
+## 1. Overview
+`MicroVTK` is a lightweight, header-only, modern C++20 library designed for high-performance exporting of VTK data files. It focuses on the XML UnstructuredGrid (`.vtu`) and Time-Series Collection (`.pvd`) formats, utilizing a zero-copy streaming architecture to minimize memory overhead.
+
+## 2. Design Goals
+- **C++20 Native:** Leverage Concepts, Spans, Ranges, and `std::format`.
+- **Zero-Copy:** Stream data directly from user memory to disk without intermediate buffering of large arrays.
+- **Zero-Dependency:** Minimal dependencies for core functionality (optional ZLIB/LZ4 for compression).
+- **Modern API:** Clean, expressive API using the adapter pattern for seamless integration with existing solvers.
+- **Extensibility:** Easy to support new data containers (Eigen, Kokkos, Cabana) through C++20 concepts.
+
+## 3. Architecture
+
+### 3.1 Layered Structure
+- **Adapter Layer:** Maps user-defined data structures (AoS, SoA, Kokkos Views) to MicroVTK-compatible ranges.
+- **Data Model Layer:** Manages metadata and type-erased references to user data.
+- **Logic Layer:** Handles VTK XML structure orchestration, offset management, and encoding.
+- **I/O Backend:** Performs physical I/O with endianness handling and optional compression.
+
+### 3.2 Directory Structure
+```text
+microvtk/
+├── common/         # Enums, Type traits, Concepts
+├── core/           # Low-level utilities
+│   ├── binary_utils.hpp # Endianness, Base64 encoding
+│   ├── data_accessor.hpp # Type-erased streaming
+│   ├── compressor.hpp   # ZLib/LZ4 abstraction
+│   └── xml_utils.hpp    # Fast XML builder using std::format
+├── adapter.hpp     # Generic range and AoS adapters
+├── vtu_writer.hpp  # Main UnstructuredGrid writer
+├── pvd_writer.hpp  # Time-series manager
+└── microvtk.hpp    # Master header
+```
+
+## 4. Core Components
+
+### 4.1 DataAccessor
+A type-erased interface used by writers to stream data. It stores a reference to a `std::ranges::range` and provides methods for writing to an `std::ostream`.
+- `size_bytes()`: Returns total payload size.
+- `write_to_stream(os)`: Streams data directly. Handles endianness conversion (Native -> Little Endian).
+
+### 4.2 XmlBuilder
+A high-performance XML generator that uses `std::format` and RAII-based `ScopedElement` for safe tag nesting.
+
+### 4.3 Adapters
+- `vtk::view(container)`: Returns a `std::span` for contiguous memory.
+- `vtk::adapt(container, &Member)`: Uses `std::views::transform` to expose a specific member from an Array-of-Structures (AoS).
+
+## 5. Data Formats & Modes
+
+### 5.1 Supported Formats
+- **VTU (.vtu):** XML UnstructuredGrid.
+- **PVD (.pvd):** XML VTK Data Grouping (Time Series).
+
+### 5.2 Storage Modes
+- **Appended (Primary):** Metadata in XML, raw binary data appended at the end. Recommended for performance.
+- **Compression:** Supports ZLib and LZ4 compression in Appended mode.
+
+## 6. API Reference
+
+### 6.1 `microvtk::VtuWriter`
+Main class for writing `.vtu` files.
+
+#### Methods:
+- `setPoints(range)`: Define point coordinates (expects `N*3` scalars).
+- `setCells(connectivity, offsets, types)`: Define mesh topology.
+- `addPointData(name, range, numComponents)`: Add nodal attributes.
+- `addCellData(name, range, numComponents)`: Add element attributes.
+- `setCompression(type)`: Set `CompressionType::ZLib`, `LZ4`, or `None`.
+- `write(filename)`: Execute the write operation.
+
+### 6.2 `microvtk::PvdWriter`
+Manager for multi-step simulations.
+
+#### Methods:
+- `addStep(time, vtu_filename)`: Register a simulation step.
+- `save()`: Write the `.pvd` file.
+
+## 7. Implementation Details
+
+### 7.1 Endianness
+VTK files default to **Little Endian**. MicroVTK automatically detects host endianness and performs byte-swapping during streaming if necessary.
+
+### 7.2 Binary Block Header
+In Appended mode, each binary block is preceded by a `UInt64` header indicating its size (in bytes). When compressed, a more complex header containing block counts and sizes is used according to VTK specifications.
+
+## 8. Requirements
+- **Compiler:** GCC 13+, Clang 16+, MSVC 19.34+ (C++20 support).
+- **Standard Library:** Full support for `std::format` and `std::ranges`.
