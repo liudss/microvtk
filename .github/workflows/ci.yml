@@ -36,6 +36,11 @@ jobs:
           echo "CXX=clang++" >> $GITHUB_ENV
         fi
 
+    - name: Install uv
+      uses: astral-sh/setup-uv@v2
+      with:
+        enable-cache: true
+
     - name: Configure CMake
       run: cmake --preset ${{ matrix.build_type }}
 
@@ -56,6 +61,11 @@ jobs:
 
     - name: Setup MSVC
       uses: ilammy/msvc-dev-cmd@v1
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v2
+      with:
+        enable-cache: true
 
     - name: Configure CMake
       run: cmake --preset msvc-debug
