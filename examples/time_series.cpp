@@ -68,7 +68,7 @@ int main() {
     }
 
     // 3. Save the PVD file (indexes all VTU files)
-    // pvd.addStep() automatically updates the file.
+    pvd.save();
   } catch (const std::exception& e) {
     return 1;
   }

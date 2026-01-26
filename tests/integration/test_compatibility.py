@@ -37,13 +37,6 @@ def basic_vtu_file():
     if not exe:
         pytest.skip("example_basic executable not found. Build the project first.")
         
-    # Run in a temp dir or just current dir? 
-    # example_basic writes to "example.vtu" in CWD.
-    # We'll run it in the tests/integration folder to keep things clean, 
-    # or just root if that's where the example expects.
-    # The example writes to "example.vtu" (relative).
-    
-    # Let's run in the project root to match typical user behavior
     cmd = [exe]
     result = subprocess.run(cmd, capture_output=True, text=True)
     
@@ -54,38 +47,54 @@ def basic_vtu_file():
     
     yield output_file
     
-    # Cleanup
     if os.path.exists(output_file):
         os.remove(output_file)
 
+@pytest.fixture(scope="module")
+def pvd_files():
+    """Runs example_time_series and yields the main PVD file."""
+    exe = find_executable("example_time_series")
+    if not exe:
+        pytest.skip("example_time_series executable not found.")
+        
+    cmd = [exe]
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    assert result.returncode == 0, f"Example failed: {result.stderr}"
+    
+    pvd_file = "wave_simulation.pvd"
+    assert os.path.exists(pvd_file), "wave_simulation.pvd was not created"
+    
+    yield pvd_file
+    
+    # Cleanup
+    if os.path.exists(pvd_file):
+        os.remove(pvd_file)
+    # Cleanup generated vtus
+    for i in range(10):
+        f = f"wave_{i}.vtu"
+        if os.path.exists(f):
+            os.remove(f)
+
 def test_read_vtu_with_official_vtk(basic_vtu_file):
     """Verifies that the generated VTU file can be read by the official VTK library."""
-    
     reader = vtk.vtkXMLUnstructuredGridReader()
     reader.SetFileName(basic_vtu_file)
     reader.Update()
     
     grid = reader.GetOutput()
     
-    # Verify Geometry
-    # The example creates a tetra with 4 points
     assert grid.GetNumberOfPoints() == 4, "Expected 4 points"
     assert grid.GetNumberOfCells() == 1, "Expected 1 cell"
     
-    # Verify Cell Type
     cell = grid.GetCell(0)
-    # VTK_TETRA is 10
     assert cell.GetCellType() == 10, f"Expected cell type 10 (Tetra), got {cell.GetCellType()}"
     
-    # Verify Point Data
-    # The example adds "Mass" array
     point_data = grid.GetPointData()
     assert point_data.HasArray("Mass"), "Point data 'Mass' missing"
     
     mass_array = point_data.GetArray("Mass")
     assert mass_array.GetNumberOfComponents() == 1
     
-    # Check values: 1.0, 2.0, 3.0, 4.0
     expected_mass = [1.0, 2.0, 3.0, 4.0]
     for i in range(4):
         val = mass_array.GetValue(i)
@@ -100,3 +109,53 @@ def test_legacy_reader_compatibility(basic_vtu_file):
     
     assert data.IsA("vtkUnstructuredGrid")
     assert data.GetNumberOfPoints() == 4
+
+def test_pvd_time_series(pvd_files):
+
+    """Verifies PVD file structure and time steps using XML parsing."""
+
+    
+
+    # Manual XML check for PVD correctness
+
+    import xml.etree.ElementTree as ET
+
+    tree = ET.parse(pvd_files)
+
+    root = tree.getroot()
+
+    
+
+    assert root.tag == "VTKFile"
+
+    assert root.attrib["type"] == "Collection"
+
+    
+
+    collection = root.find("Collection")
+
+    assert collection is not None
+
+    
+
+    datasets = collection.findall("DataSet")
+
+    assert len(datasets) == 10, f"Expected 10 time steps, found {len(datasets)}"
+
+    
+
+    # Check first step
+
+    # PvdWriter uses double for time, let's check strict equality or approximate
+
+    assert float(datasets[0].attrib["timestep"]) == 0.0
+
+    assert datasets[0].attrib["file"] == "wave_0.vtu"
+
+    
+
+    # Verify that the referenced file actually exists
+
+    assert os.path.exists(datasets[0].attrib["file"]), "Referenced .vtu file missing"
+
+
