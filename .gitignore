@@ -12,4 +12,12 @@ compile_commands.json
 # Python
 .venv/
 __pycache__/
+.pytest_cache/
 *.vtu
+*.pvd
+
+# IDEs
+.vscode/
+.vs/
+.idea/
+.clangd/
