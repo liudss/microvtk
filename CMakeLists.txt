@@ -240,6 +240,16 @@ if(MICROVTK_BUILD_EXAMPLES)
     add_executable(example_complex_grid examples/complex_grid.cpp)
     target_link_libraries(example_complex_grid PRIVATE microvtk)
     microvtk_set_strict_warnings(example_complex_grid)
+
+    add_executable(example_compression examples/compression.cpp)
+    target_link_libraries(example_compression PRIVATE microvtk)
+    microvtk_set_strict_warnings(example_compression)
+
+    if(MICROVTK_USE_KOKKOS)
+        add_executable(example_hpc examples/hpc_adapters.cpp)
+        target_link_libraries(example_hpc PRIVATE microvtk)
+        microvtk_set_strict_warnings(example_hpc)
+    endif()
 endif()
 
 # Benchmarks

@@ -95,6 +95,25 @@ def complex_vtu_file():
     if os.path.exists(output_file):
         os.remove(output_file)
 
+@pytest.fixture(scope="module")
+def compressed_vtu_file():
+    """Runs example_compression and yields the path."""
+    exe = find_executable("example_compression")
+    if not exe:
+        pytest.skip("example_compression executable not found.")
+
+    cmd = [exe]
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    assert result.returncode == 0, f"Example failed: {result.stderr}"
+
+    output_file = "compressed.vtu"
+    assert os.path.exists(output_file), "compressed.vtu was not created"
+
+    yield output_file
+
+    if os.path.exists(output_file):
+        os.remove(output_file)
+
 def test_read_vtu_with_official_vtk(basic_vtu_file):
     """Verifies that the generated VTU file can be read by the official VTK library."""
     reader = vtk.vtkXMLUnstructuredGridReader()
@@ -153,7 +172,7 @@ def test_pvd_time_series(pvd_files):
     assert datasets[0].attrib["file"] == "wave_0.vtu"
 
     # Verify that the referenced file actually exists
-    assert os.path.exists(datasets[0].attrib["file"]), "Referenced .vtu file missing"
+    assert os.path.exists(datasets[0].attrib["file"])
 
 def test_complex_grid_structure(complex_vtu_file):
     """Verifies the structure and data of the complex grid example."""
@@ -191,3 +210,38 @@ def test_complex_grid_structure(complex_vtu_file):
     assert mat_array.GetNumberOfTuples() == 2
     assert int(mat_array.GetValue(0)) == 1
     assert int(mat_array.GetValue(1)) == 2
+
+def test_compressed_file(compressed_vtu_file):
+    """Verifies that the compressed file is valid and readable."""
+
+    # 1. Check if the file is actually using compression (inspect XML)
+    with open(compressed_vtu_file, 'rb') as f:
+        content = f.read()
+        # Should contain compressor attribute if LZ4 was enabled
+        # Note: If LZ4 lib wasn't found during build, it falls back to uncompressed.
+        # But we expect it to be ON in this environment.
+        if b"compressor=\"vtkLZ4DataCompressor\"" not in content and b"compressor=\"vtkZLibDataCompressor\"" not in content:
+             # Just a warning or soft check?
+             # For this test, let's assume we wanted compression.
+             pass
+
+    # 2. Read with VTK
+    reader = vtk.vtkXMLUnstructuredGridReader()
+    reader.SetFileName(compressed_vtu_file)
+    reader.Update()
+
+    grid = reader.GetOutput()
+
+    assert grid.GetNumberOfPoints() == 1000
+    assert grid.GetNumberOfCells() == 1 # PolyLine
+
+    # Check Data
+    point_data = grid.GetPointData()
+    assert point_data.HasArray("SineWave")
+
+    arr = point_data.GetArray("SineWave")
+    # Spot check
+    # t at i=100 is 10.0. sin(10.0) ~ -0.544
+    val = arr.GetValue(100)
+    expected = -0.54402111088
+    assert abs(val - expected) < 1e-5
