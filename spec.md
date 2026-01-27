@@ -44,8 +44,8 @@ A type-erased interface used by writers to stream data. It stores a reference to
 A high-performance XML generator that uses `std::format` and RAII-based `ScopedElement` for safe tag nesting.
 
 ### 4.3 Adapters
-- `vtk::view(container)`: Returns a `std::span` for contiguous memory.
-- `vtk::adapt(container, &Member)`: Uses `std::views::transform` to expose a specific member from an Array-of-Structures (AoS).
+- `microvtk::view(container)`: Returns a `std::span` for contiguous memory.
+- `microvtk::adapt(container, &Member)`: Uses `std::views::transform` to expose a specific member from an Array-of-Structures (AoS).
 
 ## 5. Data Formats & Modes
 

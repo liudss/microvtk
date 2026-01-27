@@ -14,7 +14,7 @@ It features a **true zero-copy streaming architecture**, meaning it streams data
 - **Zero-Copy Streaming**: Data is referenced via type-erased accessors and streamed directly to disk. Ideal for handling massive datasets where memory is scarce.
 - **Zero-Dependency Core**: The core library depends only on the C++ Standard Library.
 - **Compression Support**: Optional, seamless integration with **ZLIB** and **LZ4** for efficient disk usage.
-- **Flexible Adapters**: Built-in support for Array-of-Structures (AoS) and strided data layouts via `vtk::adapt`.
+- **Flexible Adapters**: Built-in support for Array-of-Structures (AoS) and strided data layouts via `microvtk::adapt`.
 - **HPC Ecosystem Support**: Native adapters for **Kokkos Views** and **Cabana Slices** for seamless integration into large-scale HPC simulations.
 - **Time Series Support**: Native support for `.pvd` files to manage time-dependent simulations.
 - **High Performance**: Optimized for the "Appended Binary" VTK format, achieving disk-bound write speeds.
@@ -93,7 +93,7 @@ int main() {
 
 ### 2. Handling Array-of-Structures (AoS)
 
-Use `vtk::adapt` to write data directly from your custom structs without manual copying.
+Use `microvtk::adapt` to write data directly from your custom structs without manual copying.
 
 ```cpp
 struct Particle {

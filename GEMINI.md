@@ -62,7 +62,7 @@ microvtk/
 
 ### Phase 1-3: Core & Adapters (Completed)
 - Full support for C++20 Ranges and Spans.
-- `vtk::adapt` for Array-of-Structures (AoS) processing.
+- `microvtk::adapt` for Array-of-Structures (AoS) processing.
 - Type-erased `DataAccessor` for seamless integration of various container types.
 
 ### Phase 4: VTU Writer (Completed)
