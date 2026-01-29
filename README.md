@@ -116,11 +116,15 @@ MicroVTK provides specialized adapters for high-performance computing frameworks
 
 #### Kokkos View
 Directly write from `Kokkos::View` (must be accessible from `HostSpace`).
+Supports both contiguous layouts (`LayoutRight`, `LayoutLeft` for rank 1) and non-contiguous layouts (`LayoutLeft` for rank 2, `LayoutStride`).
 ```cpp
+// Contiguous View (Fast Path)
 Kokkos::View<double*[3], Kokkos::LayoutRight, Kokkos::HostSpace> points("pts", N);
-// ... fill points ...
-
 writer.setPoints(microvtk::adapt(points));
+
+// Non-Contiguous View (Logical Indexing Path)
+Kokkos::View<double*[3], Kokkos::LayoutLeft, Kokkos::HostSpace> column_major("data", N);
+writer.addPointData("Pressure", microvtk::adapt(column_major));
 ```
 
 #### Cabana AoSoA
@@ -196,9 +200,13 @@ ctest -R Integration.Python
 ```text
 microvtk/
 ├── include/microvtk/   # Header files
-│   ├── common/         # Enums, Concepts
-│   ├── core/           # Data Accessors, XML Utils, Binary Utils
-│   └── ...             # Writer implementations
+│   ├── common/         # Enums (types.hpp)
+│   ├── core/           # Data Accessors, XML Utils, Binary Utils, Compression
+│   ├── adapter.hpp     # Standard C++ container adapters
+│   ├── kokkos_adapter.hpp # Kokkos View support
+│   ├── cabana_adapter.hpp # Cabana Slice support
+│   ├── vtu_writer.hpp  # UnstructuredGrid Writer
+│   └── pvd_writer.hpp  # TimeSeries Writer
 ├── examples/           # Usage examples
 ├── tests/              # Unit tests (GoogleTest)
 └── benchmarks/         # Performance benchmarks (Google Benchmark)

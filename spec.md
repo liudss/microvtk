@@ -21,16 +21,20 @@
 ### 3.2 Directory Structure
 ```text
 microvtk/
-├── common/         # Enums, Type traits, Concepts
-├── core/           # Low-level utilities
-│   ├── binary_utils.hpp # Endianness, Base64 encoding
-│   ├── data_accessor.hpp # Type-erased streaming
-│   ├── compressor.hpp   # ZLib/LZ4 abstraction
-│   └── xml_utils.hpp    # Fast XML builder using std::format
-├── adapter.hpp     # Generic range and AoS adapters
-├── vtu_writer.hpp  # Main UnstructuredGrid writer
-├── pvd_writer.hpp  # Time-series manager
-└── microvtk.hpp    # Master header
+├── include/microvtk/
+│   ├── common/
+│   │   └── types.hpp       # Enums, Type traits, Concepts
+│   ├── core/
+│   │   ├── binary_utils.hpp # Endianness, Base64 encoding
+│   │   ├── compressor.hpp   # ZLib/LZ4 abstraction
+│   │   ├── data_accessor.hpp # Type-erased streaming
+│   │   └── xml_utils.hpp    # Fast XML builder using std::format
+│   ├── adapter.hpp          # Generic range and AoS adapters
+│   ├── cabana_adapter.hpp   # Adapter for Cabana slices
+│   ├── kokkos_adapter.hpp   # Adapter for Kokkos Views
+│   ├── vtu_writer.hpp       # Main UnstructuredGrid writer
+│   ├── pvd_writer.hpp       # Time-series manager
+│   └── microvtk.hpp         # Master header
 ```
 
 ## 4. Core Components
@@ -46,6 +50,8 @@ A high-performance XML generator that uses `std::format` and RAII-based `ScopedE
 ### 4.3 Adapters
 - `microvtk::view(container)`: Returns a `std::span` for contiguous memory.
 - `microvtk::adapt(container, &Member)`: Uses `std::views::transform` to expose a specific member from an Array-of-Structures (AoS).
+- **HPC Adapters**: Specialized support for `Kokkos::View` and `Cabana::Slice`.
+    - **Kokkos**: Supports `LayoutRight`, `LayoutLeft`, and `LayoutStride`. Contiguous layouts use a fast `std::span` path, while non-contiguous layouts (e.g., Rank 2 `LayoutLeft`) use a C++20 `std::views::transform` path to ensure logical indexing order.
 
 ## 5. Data Formats & Modes
 

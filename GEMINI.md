@@ -39,15 +39,19 @@ microvtk/
 ├── external/               # Third-party dependencies (GTest, Benchmark)
 ├── include/
 │   └── microvtk/
-│       ├── common/         # Enums, Concepts, Traits
+│       ├── common/
+│       │   └── types.hpp         # Enums, Concepts, Traits
 │       ├── core/
-│       │   ├── binary_utils.hpp   # Endianness, Base64
+│       │   ├── binary_utils.hpp  # Endianness, Base64
+│       │   ├── compressor.hpp    # Compression wrappers
 │       │   ├── data_accessor.hpp # Type-erased data streaming (Zero-copy)
 │       │   └── xml_utils.hpp     # std::format based XML builder
-│       ├── vtu_writer.hpp  # Main UnstructuredGrid Writer (Streaming)
-│       ├── pvd_writer.hpp  # Time Series Writer (Explicit Save)
-│       ├── adapter.hpp     # Data Adapters (AoS support)
-│       └── microvtk.hpp    # Main entry header
+│       ├── vtu_writer.hpp    # Main UnstructuredGrid Writer (Streaming)
+│       ├── pvd_writer.hpp    # Time Series Writer (Explicit Save)
+│       ├── adapter.hpp       # Data Adapters (AoS support)
+│       ├── cabana_adapter.hpp # Cabana Adapter
+│       ├── kokkos_adapter.hpp # Kokkos Adapter
+│       └── microvtk.hpp      # Main entry header
 ├── tests/
 │   ├── integration/        # Python compatibility tests (Official VTK)
 │   └── ...                 # Unit tests (GTest)
@@ -60,10 +64,10 @@ microvtk/
 
 ## 4. Implementation Status
 
-### Phase 1-3: Core & Adapters (Completed)
-- Full support for C++20 Ranges and Spans.
-- `microvtk::adapt` for Array-of-Structures (AoS) processing.
-- Type-erased `DataAccessor` for seamless integration of various container types.
+### Phase 3: HPC Adapters (Updated)
+- Native adapters for **Kokkos Views** and **Cabana Slices**.
+- **Kokkos**: Automatic dispatch between fast path (`std::span`) and logical indexing path (`std::views::transform`) to support all layouts including `LayoutLeft` and `LayoutStride` (Rank 1 & 2).
+- **Cabana**: Automatic flattening of AoSoA slices.
 
 ### Phase 4: VTU Writer (Completed)
 - Implemented **Streaming Mode**.

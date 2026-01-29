@@ -73,7 +73,7 @@ public:
 // Factory
 inline std::unique_ptr<Compressor> createCompressor(CompressionType type) {
   switch (type) {
-    case CompressionType::ZLib:
+    case CompressionType::ZLib:  // NOLINT(bugprone-branch-clone)
 #ifdef MICROVTK_HAS_ZLIB
       return std::make_unique<ZlibCompressor>();
 #else
