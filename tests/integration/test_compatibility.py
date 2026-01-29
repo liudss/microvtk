@@ -9,6 +9,7 @@ def find_executable(name):
     """Finds the build executable in likely locations."""
     # Possible build directories
     candidates = [
+        "build_repro",
         "build",
         "build/bin",
         "build/examples",
@@ -245,3 +246,74 @@ def test_compressed_file(compressed_vtu_file):
     val = arr.GetValue(100)
     expected = -0.54402111088
     assert abs(val - expected) < 1e-5
+
+@pytest.fixture(scope="module")
+def hpc_vtu_file():
+    """Runs example_hpc and yields the path to the generated vtu file."""
+    exe = find_executable("example_hpc")
+    if not exe:
+        # If compiled without HPC support, this executable might not exist.
+        pytest.skip("example_hpc executable not found. Build with MICROVTK_USE_KOKKOS=ON.")
+
+    cmd = [exe]
+    result = subprocess.run(cmd, capture_output=True, text=True)
+
+    # If built but failed to run (e.g. dynamic link error), fail test
+    assert result.returncode == 0, f"HPC Example failed: {result.stderr}"
+
+    output_file = "hpc_example.vtu"
+    assert os.path.exists(output_file), "hpc_example.vtu was not created"
+
+    yield output_file
+
+    if os.path.exists(output_file):
+        os.remove(output_file)
+
+def test_hpc_data_correctness(hpc_vtu_file):
+    """Verifies Kokkos Rank 3 and Cabana MultiDim array output."""
+    reader = vtk.vtkXMLUnstructuredGridReader()
+    reader.SetFileName(hpc_vtu_file)
+    reader.Update()
+
+    grid = reader.GetOutput()
+    point_data = grid.GetPointData()
+
+    # 1. Check Kokkos Rank 3 Tensor (StressTensor)
+    if point_data.HasArray("StressTensor"):
+        stress = point_data.GetArray("StressTensor")
+        # Should be flat 9 components
+        assert stress.GetNumberOfComponents() == 9
+
+        # Check value at index 0
+        # Expected: r*10 + c + (0%2) = r*10 + c
+        # (0,0)->0, (0,1)->1 ... (2,2)->22
+        t0 = stress.GetTuple9(0)
+        assert t0[0] == 0.0
+        assert t0[8] == 22.0
+
+        # Check value at index 1
+        # Expected: r*10 + c + 1
+        t1 = stress.GetTuple9(1)
+        assert t1[0] == 1.0 # 0 + 1
+        assert t1[8] == 23.0
+    else:
+        # It's possible the test runs on an environment without Kokkos enabled
+        # But fixture should skip if exe not found.
+        # If exe found, it MUST have the data.
+        pytest.fail("Missing 'StressTensor' array from Kokkos adapter")
+
+    # 2. Check Cabana MultiDim Array (CabanaTensor)
+    # Note: Cabana might not be enabled even if Kokkos is.
+    # We need to check if the array exists only if we expect it.
+    # However, the example code uses #ifdef MICROVTK_HAS_CABANA.
+    # We can check presence if we assume the CI builds full features.
+
+    if point_data.HasArray("CabanaTensor"):
+        cabana = point_data.GetArray("CabanaTensor")
+        assert cabana.GetNumberOfComponents() == 9
+
+        # Expected: (r+1)*100 + c
+        # (0,0) -> 100, (2,2) -> 302
+        t0 = cabana.GetTuple9(0)
+        assert t0[0] == 100.0
+        assert t0[8] == 302.0

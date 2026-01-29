@@ -23,7 +23,7 @@ struct DataAccessor {
 template <std::ranges::range R>
 class RangeAccessor : public DataAccessor {
 public:
-  explicit RangeAccessor(const R& range) : range_(range) {}
+  explicit RangeAccessor(R range) : range_(std::move(range)) {}
 
   void write_to(std::vector<uint8_t>& buffer) const override {
     // This might be inefficient if used, but provided for compatibility
@@ -68,7 +68,7 @@ public:
   }
 
 private:
-  const R& range_;
+  R range_;
 };
 
 }  // namespace microvtk::core
