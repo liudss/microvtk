@@ -54,6 +54,58 @@ TEST(KokkosAdapterTest, AdaptView2D) {
   EXPECT_DOUBLE_EQ(span[2], 2.0);
   EXPECT_DOUBLE_EQ(span[14], 14.0);
 }
+
+TEST(KokkosAdapterTest, AdaptView2D_LayoutLeft) {
+  // 5 points, 3 components, LayoutLeft (Column Major)
+  // Memory: x0, x1... y0, y1...
+  // Logical: (x0, y0, z0), (x1, y1, z1)...
+  Kokkos::View<double* [3], Kokkos::LayoutLeft, Kokkos::HostSpace> view("v_ll",
+                                                                        5);
+  for (int i = 0; i < 5; ++i) {
+    view(i, 0) = i * 10.0 + 1.0;
+    view(i, 1) = i * 10.0 + 2.0;
+    view(i, 2) = i * 10.0 + 3.0;
+  }
+
+  auto range = microvtk::adapt(view);
+  ASSERT_EQ(std::ranges::size(range), 15);
+
+  // Use iterator to verify order
+  auto it = std::ranges::begin(range);
+  // Point 0: (1, 2, 3)
+  EXPECT_DOUBLE_EQ(*it++, 1.0);
+  EXPECT_DOUBLE_EQ(*it++, 2.0);
+  EXPECT_DOUBLE_EQ(*it++, 3.0);
+  // Point 1: (11, 12, 13)
+  EXPECT_DOUBLE_EQ(*it++, 11.0);
+  EXPECT_DOUBLE_EQ(*it++, 12.0);
+  EXPECT_DOUBLE_EQ(*it++, 13.0);
+}
+
+TEST(KokkosAdapterTest, AdaptView2D_LayoutStride) {
+  // Create a strided view via subview
+  Kokkos::View<double* [3], Kokkos::LayoutRight, Kokkos::HostSpace> orig(
+      "v_orig", 10);
+  for (int i = 0; i < 10; ++i) {
+    orig(i, 0) = i;
+    orig(i, 1) = i + 0.1;
+    orig(i, 2) = i + 0.2;
+  }
+
+  // Take a subview: rows 2 to 5 (exclusive) -> 3 rows
+  auto sub = Kokkos::subview(orig, std::make_pair(2, 5), Kokkos::ALL);
+
+  auto range = microvtk::adapt(sub);
+  ASSERT_EQ(std::ranges::size(range), 3 * 3);
+
+  auto it = std::ranges::begin(range);
+  // Row 2
+  EXPECT_DOUBLE_EQ(*it++, 2.0);
+  EXPECT_DOUBLE_EQ(*it++, 2.1);
+  EXPECT_DOUBLE_EQ(*it++, 2.2);
+  // Row 3
+  EXPECT_DOUBLE_EQ(*it++, 3.0);
+}
 #endif
 
 #ifdef MICROVTK_HAS_CABANA

@@ -95,6 +95,36 @@ static void BM_Kokkos_Iterate_2D(benchmark::State& state) {
 }
 BENCHMARK(BM_Kokkos_Iterate_2D)->Range(1024, 1024 * 1024);
 
+static void BM_Kokkos_Iterate_2D_LayoutLeft(benchmark::State& state) {
+  size_t num_tuples = state.range(0);
+  // LayoutLeft: Column Major (Not C-contiguous for rank 2 if we view it as
+  // array of structs)
+  Kokkos::View<double* [3], Kokkos::LayoutLeft, Kokkos::HostSpace> view(
+      "v_ll", num_tuples);
+
+  // Fill data
+  for (size_t i = 0; i < num_tuples; ++i) {
+    view(i, 0) = i;
+    view(i, 1) = i;
+    view(i, 2) = i;
+  }
+
+  // This should trigger the Slow Path (iota | transform)
+  auto range = microvtk::adapt(view);
+  size_t total_size = num_tuples * 3;
+
+  for (auto _ : state) {
+    double sum = 0.0;
+    // Iterate through the virtual flattened range
+    for (auto val : range) {
+      sum += val;
+    }
+    benchmark::DoNotOptimize(sum);
+  }
+  state.SetBytesProcessed(state.iterations() * total_size * sizeof(double));
+}
+BENCHMARK(BM_Kokkos_Iterate_2D_LayoutLeft)->Range(1024, 1024 * 1024);
+
 #endif  // MICROVTK_HAS_KOKKOS
 
 // ----------------------------------------------------------------------------
