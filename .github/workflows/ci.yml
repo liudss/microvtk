@@ -24,7 +24,7 @@ jobs:
     - name: Install Dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y ninja-build
+        sudo apt-get install -y ninja-build valgrind
 
     - name: Setup Compiler Environment
       run: |
@@ -49,11 +49,13 @@ jobs:
 
     - name: Test
       run: ctest --test-dir build/${{ matrix.build_type }} --output-on-failure
+      env:
+        MICROVTK_USE_VALGRIND: ON
 
   build-windows:
     name: Windows (MSVC)
     runs-on: windows-latest
-    
+
     steps:
     - uses: actions/checkout@v4
       with:

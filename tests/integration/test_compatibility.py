@@ -37,83 +37,75 @@ def basic_vtu_file():
     """Runs example_basic and yields the path to the generated vtu file."""
     exe = find_executable("example_basic")
     if not exe:
-        pytest.skip("example_basic executable not found. Build the project first.")
+        pytest.skip(f"{name} executable not found. Build the project first.")
 
     cmd = [exe]
+
+    # Check if Valgrind is enabled in environment
+    if os.environ.get("MICROVTK_USE_VALGRIND") == "ON":
+        valgrind_exe = shutil.which("valgrind")
+        if valgrind_exe:
+             cmd = [valgrind_exe, "--leak-check=full", "--error-exitcode=1", exe]
+
     result = subprocess.run(cmd, capture_output=True, text=True)
 
-    assert result.returncode == 0, f"Example failed: {result.stderr}"
+    assert result.returncode == 0, f"{name} failed: {result.stderr}"
 
-    output_file = "example.vtu"
-    assert os.path.exists(output_file), "example.vtu was not created"
+    return exe
 
-    yield output_file
+def run_example(name, output_files):
+    exe = find_executable(name)
+    if not exe:
+        pytest.skip(f"{name} executable not found.")
 
-    if os.path.exists(output_file):
-        os.remove(output_file)
+    cmd = [exe]
+    if os.environ.get("MICROVTK_USE_VALGRIND") == "ON":
+        valgrind_exe = shutil.which("valgrind")
+        if valgrind_exe:
+             cmd = [valgrind_exe, "--leak-check=full", "--error-exitcode=1", exe]
+
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    assert result.returncode == 0, f"{name} failed: {result.stderr}"
+
+    for f in output_files:
+        assert os.path.exists(f), f"{f} was not created"
+
+    return output_files
+
+@pytest.fixture(scope="module")
+def basic_vtu_file():
+    """Runs example_basic and yields the path to the generated vtu file."""
+    output = "example.vtu"
+    run_example("example_basic", [output])
+    yield output
+    if os.path.exists(output): os.remove(output)
 
 @pytest.fixture(scope="module")
 def pvd_files():
     """Runs example_time_series and yields the main PVD file."""
-    exe = find_executable("example_time_series")
-    if not exe:
-        pytest.skip("example_time_series executable not found.")
-
-    cmd = [exe]
-    result = subprocess.run(cmd, capture_output=True, text=True)
-    assert result.returncode == 0, f"Example failed: {result.stderr}"
-
-    pvd_file = "wave_simulation.pvd"
-    assert os.path.exists(pvd_file), "wave_simulation.pvd was not created"
-
-    yield pvd_file
-
-    # Cleanup
-    if os.path.exists(pvd_file):
-        os.remove(pvd_file)
-    # Cleanup generated vtus
+    output = "wave_simulation.pvd"
+    run_example("example_time_series", [output])
+    yield output
+    if os.path.exists(output): os.remove(output)
     for i in range(10):
         f = f"wave_{i}.vtu"
-        if os.path.exists(f):
-            os.remove(f)
+        if os.path.exists(f): os.remove(f)
 
 @pytest.fixture(scope="module")
 def complex_vtu_file():
     """Runs example_complex_grid and yields the path to the generated vtu file."""
-    exe = find_executable("example_complex_grid")
-    if not exe:
-        pytest.skip("example_complex_grid executable not found.")
-
-    cmd = [exe]
-    result = subprocess.run(cmd, capture_output=True, text=True)
-    assert result.returncode == 0, f"Example failed: {result.stderr}"
-
-    output_file = "complex_grid.vtu"
-    assert os.path.exists(output_file), "complex_grid.vtu was not created"
-
-    yield output_file
-
-    if os.path.exists(output_file):
-        os.remove(output_file)
+    output = "complex_grid.vtu"
+    run_example("example_complex_grid", [output])
+    yield output
+    if os.path.exists(output): os.remove(output)
 
 @pytest.fixture(scope="module")
 def compressed_vtu_file():
     """Runs example_compression and yields the path."""
-    exe = find_executable("example_compression")
-    if not exe:
-        pytest.skip("example_compression executable not found.")
-
-    cmd = [exe]
-    result = subprocess.run(cmd, capture_output=True, text=True)
-    assert result.returncode == 0, f"Example failed: {result.stderr}"
-
-    output_file = "compressed.vtu"
-    assert os.path.exists(output_file), "compressed.vtu was not created"
-
-    yield output_file
-
-    if os.path.exists(output_file):
-        os.remove(output_file)
+    output = "compressed.vtu"
+    run_example("example_compression", [output])
+    yield output
+    if os.path.exists(output): os.remove(output)
 
 def test_read_vtu_with_official_vtk(basic_vtu_file):
     """Verifies that the generated VTU file can be read by the official VTK library."""
@@ -250,25 +242,19 @@ def test_compressed_file(compressed_vtu_file):
 @pytest.fixture(scope="module")
 def hpc_vtu_file():
     """Runs example_hpc and yields the path to the generated vtu file."""
+    output = "hpc_example.vtu"
+    # Note: run_example handles finding exe and valgrind
+    # But run_example skips if not found. We might want a custom message for HPC.
+    # But run_example is generic enough.
+
+    # We can check for executable first to give better skip message
     exe = find_executable("example_hpc")
     if not exe:
-        # If compiled without HPC support, this executable might not exist.
         pytest.skip("example_hpc executable not found. Build with MICROVTK_USE_KOKKOS=ON.")
 
-    cmd = [exe]
-    result = subprocess.run(cmd, capture_output=True, text=True)
-
-    # If built but failed to run (e.g. dynamic link error), fail test
-    assert result.returncode == 0, f"HPC Example failed: {result.stderr}"
-
-    output_file = "hpc_example.vtu"
-    assert os.path.exists(output_file), "hpc_example.vtu was not created"
-
-    yield output_file
-
-    if os.path.exists(output_file):
-        os.remove(output_file)
-
+    run_example("example_hpc", [output])
+    yield output
+    if os.path.exists(output): os.remove(output)
 def test_hpc_data_correctness(hpc_vtu_file):
     """Verifies Kokkos Rank 3 and Cabana MultiDim array output."""
     reader = vtk.vtkXMLUnstructuredGridReader()
