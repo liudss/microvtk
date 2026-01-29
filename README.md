@@ -4,216 +4,187 @@
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 [![CI](https://github.com/liudss/microvtk/actions/workflows/ci.yml/badge.svg)](https://github.com/liudss/microvtk/actions/workflows/ci.yml)
 
-**MicroVTK** is a lightweight, high-performance, header-only C++20 library designed for writing VTK XML files (`.vtu`, `.pvd`) in scientific simulations.
+**MicroVTK** is a lightweight, header-only C++20 library designed for high-performance scientific data visualization. It specializes in writing **VTK XML** files (`.vtu`, `.pvd`) with a focus on efficiency, memory safety, and seamless integration with modern HPC ecosystems.
 
-It features a **true zero-copy streaming architecture**, meaning it streams data directly from your memory structures to disk without intermediate buffering, minimizing memory footprint and maximizing I/O throughput.
+> **Key Philosophy:** "Your data stays where it is. We just stream it to disk."
 
-## Key Features
+## 🚀 Key Features
 
-- **Modern C++20**: Built from the ground up using Concepts, Ranges, Spans, and `std::format`.
-- **Zero-Copy Streaming**: Data is referenced via type-erased accessors and streamed directly to disk. Ideal for handling massive datasets where memory is scarce.
-- **Zero-Dependency Core**: The core library depends only on the C++ Standard Library.
-- **Compression Support**: Optional, seamless integration with **ZLIB** and **LZ4** for efficient disk usage.
-- **Flexible Adapters**: Built-in support for Array-of-Structures (AoS) and strided data layouts via `microvtk::adapt`.
-- **HPC Ecosystem Support**: Native adapters for **Kokkos Views** and **Cabana Slices** for seamless integration into large-scale HPC simulations.
-- **Time Series Support**: Native support for `.pvd` files to manage time-dependent simulations.
-- **High Performance**: Optimized for the "Appended Binary" VTK format, achieving disk-bound write speeds.
+| Feature | Description |
+| :--- | :--- |
+| **Zero-Copy Streaming** | Data is streamed directly from user memory to disk. No intermediate buffers, no redundant copies. |
+| **Modern C++20** | Built with Concepts, Ranges, Spans, and `std::format` for a type-safe and expressive API. |
+| **HPC Ready** | Native adapters for **Kokkos Views** (arbitrary Rank/Layout) and **Cabana Slices** (SoA/AoS/Tensor). |
+| **Compression** | Transparent support for **ZLIB** and **LZ4** compression to reduce I/O bottlenecks. |
+| **Zero Dependencies** | The core library depends *only* on the C++ Standard Library. Optional features use standard submodules. |
+| **Memory Safe** | Rigorously tested with **Valgrind** in CI to ensure no leaks or dangling references. |
 
-## Integration
+---
 
-### CMake (Recommended)
+## 📦 Integration
 
-MicroVTK is designed to be easily integrated as a CMake submodule.
+MicroVTK is designed as a **header-only** library. The recommended way to use it is via CMake `add_subdirectory`.
 
-1.  **Add as a submodule**:
-    ```bash
-    git submodule add https://github.com/liudss/microvtk.git external/microvtk
-    ```
-
-2.  **Update `CMakeLists.txt`**:
-    ```cmake
-    add_subdirectory(external/microvtk)
-    target_link_libraries(your_target PRIVATE microvtk::microvtk)
-    ```
-
-### Optional Dependencies
-
-You can control feature support via CMake options:
-
-| Option | Description | Default |
-|--------|-------------|---------|
-| `MICROVTK_USE_ZLIB` | Enable ZLIB compression | ON |
-| `MICROVTK_USE_LZ4` | Enable LZ4 compression | ON |
-| `MICROVTK_USE_KOKKOS` | Enable Kokkos View adapter | OFF |
-| `MICROVTK_USE_CABANA` | Enable Cabana Slice adapter | OFF |
-
-```cmake
-set(MICROVTK_USE_KOKKOS ON)
-set(MICROVTK_USE_CABANA ON)
-add_subdirectory(external/microvtk)
+### 1. Add as Submodule
+```bash
+git submodule add https://github.com/liudss/microvtk.git external/microvtk
 ```
 
-## Usage Examples
+### 2. Configure CMake
+```cmake
+# Optional: Enable HPC features
+set(MICROVTK_USE_KOKKOS ON)
+set(MICROVTK_USE_CABANA ON)
+set(MICROVTK_USE_LZ4 ON)
 
-### 1. Basic VTU Writer (Unstructured Grid)
+add_subdirectory(external/microvtk)
+
+add_executable(my_simulation main.cpp)
+target_link_libraries(my_simulation PRIVATE microvtk::microvtk)
+```
+
+---
+
+## 💡 Usage Examples
+
+### 1. Basic Unstructured Grid (.vtu)
+Stream standard C++ vectors directly to a VTU file.
 
 ```cpp
 #include <microvtk/microvtk.hpp>
 #include <vector>
 
 int main() {
-    using namespace microvtk;
+    microvtk::VtuWriter writer;
 
-    VtuWriter writer;
-
-    // 1. Set Geometry (Zero-copy references)
-    // Data must remain valid until writer.write() is called
-    std::vector<double> points = {
-        0.0, 0.0, 0.0,
-        1.0, 0.0, 0.0,
-        0.0, 1.0, 0.0
-    };
+    // 1. Geometry (N points, 3 components)
+    std::vector<double> points = {0,0,0, 1,0,0, 0,1,0, 0,0,1};
     writer.setPoints(points);
 
-    // 2. Set Topology
-    std::vector<int32_t> conn = {0, 1, 2};
-    std::vector<int32_t> offsets = {3};
-    std::vector<uint8_t> types = {static_cast<uint8_t>(CellType::Triangle)};
+    // 2. Topology (Single Tetrahedron)
+    std::vector<int32_t> conn = {0, 1, 2, 3};
+    std::vector<int32_t> offsets = {4};
+    std::vector<uint8_t> types = {static_cast<uint8_t>(microvtk::CellType::Tetra)};
     writer.setCells(conn, offsets, types);
 
-    // 3. Add Data Attributes
-    std::vector<double> temperature = {298.15, 300.0, 310.5};
-    writer.addPointData("Temperature", temperature);
+    // 3. Data Attributes
+    std::vector<double> pressure = {101.3, 102.0, 101.5, 100.8};
+    writer.addPointData("Pressure", pressure);
 
-    // 4. Write to Disk
-    // By default, uses Appended Binary mode (Little Endian)
-    writer.write("simulation_step.vtu");
+    writer.write("mesh.vtu");
 }
 ```
 
-### 2. Handling Array-of-Structures (AoS)
-
-Use `microvtk::adapt` to write data directly from your custom structs without manual copying.
+### 2. High-Performance Computing (Kokkos)
+Handle complex, multi-dimensional array layouts automatically. MicroVTK maps logical indices to VTK's expected order without data replication.
 
 ```cpp
-struct Particle {
-    double mass;
-    double velocity[3];
-};
+// 1. Contiguous Data (Fast Path)
+// Direct memory mapping for standard LayoutRight (C-style) views
+Kokkos::View<double*[3], Kokkos::LayoutRight, Kokkos::HostSpace> coords("coords", N);
+writer.setPoints(microvtk::adapt(coords));
 
-std::vector<Particle> particles = ...;
+// 2. Strided / Non-Contiguous Data (Rank-3 Tensor Field)
+// Supports LayoutLeft (Fortran-style) and arbitrary Rank
+Kokkos::View<double*[3][3], Kokkos::LayoutLeft, Kokkos::HostSpace> stress("stress", N);
 
-// Write 'mass' directly from the struct vector
-writer.addPointData("Mass", microvtk::adapt(particles, &Particle::mass));
-
-// Write 'velocity' (3 components)
-writer.addPointData("Velocity", microvtk::adapt(particles, &Particle::velocity), 3);
+// Automatically maps (N, 3, 3) -> (N, 9) flat components
+writer.addPointData("StressTensor", microvtk::adapt(stress), 9);
 ```
 
-### 3. HPC Adapters (Kokkos & Cabana)
+### 3. Particle Systems (Cabana)
+Seamlessly slice and flatten Array-of-Structs-of-Arrays (AoSoA) structures.
 
-MicroVTK provides specialized adapters for high-performance computing frameworks.
-
-#### Kokkos View
-Directly write from `Kokkos::View` (must be accessible from `HostSpace`).
-Supports both contiguous layouts (`LayoutRight`) and non-contiguous/strided layouts (`LayoutLeft`, `LayoutStride`) for **arbitrary Ranks**. Data is automatically mapped to VTK's logical Row-Major order.
 ```cpp
-// Contiguous View (Fast Path)
-Kokkos::View<double*[3], Kokkos::LayoutRight, Kokkos::HostSpace> points("pts", N);
-writer.setPoints(microvtk::adapt(points));
+using DataTypes = Cabana::MemberTypes<double[3], double[3][3]>;
+Cabana::AoSoA<DataTypes, Kokkos::HostSpace> particles("particles", N);
 
-// Non-Contiguous / High-Rank View (Logical Indexing Path)
-// E.g., a Rank 3 Tensor field (N x 3 x 3)
-Kokkos::View<double*[3][3], Kokkos::LayoutLeft, Kokkos::HostSpace> tensors("data", N);
-writer.addPointData("Stress", microvtk::adapt(tensors));
-```
+auto velocity_slice = Cabana::slice<0>(particles);
+auto stress_slice = Cabana::slice<1>(particles);
 
-#### Cabana AoSoA
-Write flattened data from Cabana slices. It automatically handles the conversion from AoSoA layouts to the flat scalar ranges required by VTK, including support for **multidimensional array** members.
-```cpp
-// Slice with a 3x3 tensor member
-using MemberTypes = Cabana::MemberTypes<double[3][3], double>;
-Cabana::AoSoA<MemberTypes, Kokkos::HostSpace> aosoa("data", N);
-auto stress_slice = Cabana::slice<0>(aosoa);
-
-// Automatically flattens the N x [3][3] slice into a flat 9N range
-writer.addPointData("Stress", microvtk::adapt(stress_slice));
+// Write velocity (3 components) and stress tensor (9 components)
+writer.addPointData("Velocity", microvtk::adapt(velocity_slice), 3);
+writer.addPointData("Stress", microvtk::adapt(stress_slice), 9);
 ```
 
 ### 4. Time Series (.pvd)
+Manage transient simulations with the PVD writer.
 
 ```cpp
-PvdWriter pvd("output/simulation.pvd");
+microvtk::PvdWriter pvd("simulation.pvd");
 
 for (int step = 0; step < 100; ++step) {
-    std::string filename = std::format("step_{}.vtu", step);
+    std::string filename = std::format("step_{:04d}.vtu", step);
 
     // ... write vtu file ...
 
-    // Register step in PVD file
+    // Register file and timestamp
     pvd.addStep(step * 0.01, filename);
-
-    // Explicit save allows updating the PVD file during the simulation
-    pvd.save();
+    pvd.save(); // Explicit save updates the file on disk immediately
 }
 ```
 
-### 5. Enabling Compression
+---
 
-```cpp
-// Set compression mode before writing
-writer.setCompression(core::CompressionType::LZ4);
-writer.write("compressed_output.vtu");
+## 🛠️ Building & Testing
+
+### Requirements
+*   **Compiler**: GCC 13+, Clang 16+, MSVC 19.34+ (C++20 compliant)
+*   **CMake**: 3.25+
+*   **Ninja**: Recommended build system
+
+### Build Instructions
+```bash
+git clone --recursive https://github.com/liudss/microvtk.git
+cd microvtk
+
+# Configure
+cmake -S . -B build -G Ninja \
+    -D MICROVTK_BUILD_TESTS=ON \
+    -D MICROVTK_BUILD_EXAMPLES=ON
+
+# Build
+cmake --build build
 ```
 
-## Building the Project
+### Running Tests
+The project includes comprehensive unit tests (GoogleTest) and integration tests (Python + VTK).
 
-To build the tests and benchmarks included in this repository:
+**Unit Tests:**
+```bash
+./build/unit_tests
+```
+
+**Integration Tests (with Memory Safety):**
+MicroVTK supports running integration tests under **Valgrind** to guarantee memory safety.
 
 ```bash
-mkdir build && cd build
-cmake -G Ninja -D MICROVTK_BUILD_TESTS=ON -D MICROVTK_BUILD_BENCHMARKS=ON ..
-cmake --build .
+# Install uv for Python dependency management
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Run integration tests
+# Set environment variable to enable strict Valgrind checking
+export MICROVTK_USE_VALGRIND=ON
+uv run pytest tests/integration
 ```
 
-**Run Unit Tests:**
-```bash
-./unit_tests
-```
+---
 
-**Run Integration Tests:**
-Integration tests use Python and the official VTK library to verify compatibility. We recommend using `uv` to manage the environment.
-
-```bash
-# Install uv (if needed)
-# curl -LsSf https://astral.sh/uv/install.sh | sh
-
-# Run tests
-uv run pytest
-```
-
-Or via CTest (if `uv` is installed):
-```bash
-ctest -R Integration.Python
-```
-
-## Project Structure
+## 📂 Project Structure
 
 ```text
 microvtk/
-├── include/microvtk/   # Header files
-│   ├── common/         # Enums (types.hpp)
-│   ├── core/           # Data Accessors, XML Utils, Binary Utils, Compression
-│   ├── adapter.hpp     # Standard C++ container adapters
-│   ├── kokkos_adapter.hpp # Kokkos View support
-│   ├── cabana_adapter.hpp # Cabana Slice support
-│   ├── vtu_writer.hpp  # UnstructuredGrid Writer
-│   └── pvd_writer.hpp  # TimeSeries Writer
-├── examples/           # Usage examples
-├── tests/              # Unit tests (GoogleTest)
-└── benchmarks/         # Performance benchmarks (Google Benchmark)
+├── include/microvtk/       # Header-only library source
+│   ├── common/             # Concepts, Types, Enums
+│   ├── core/               # Streaming logic, Compression, XML Builders
+│   ├── vtu_writer.hpp      # UnstructuredGrid Writer
+│   ├── pvd_writer.hpp      # Time Series Writer
+│   └── *_adapter.hpp       # Data Adapters (std, Kokkos, Cabana)
+├── examples/               # Example usages (Basic, HPC, Compression)
+├── tests/                  # Unit and Integration tests
+└── external/               # Third-party dependencies (Submodules)
 ```
 
-## License
+## 📄 License
 
-This project is licensed under the **MIT License**.
+This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) file for details.
