@@ -116,26 +116,28 @@ MicroVTK provides specialized adapters for high-performance computing frameworks
 
 #### Kokkos View
 Directly write from `Kokkos::View` (must be accessible from `HostSpace`).
-Supports both contiguous layouts (`LayoutRight`, `LayoutLeft` for rank 1) and non-contiguous layouts (`LayoutLeft` for rank 2, `LayoutStride`).
+Supports both contiguous layouts (`LayoutRight`) and non-contiguous/strided layouts (`LayoutLeft`, `LayoutStride`) for **arbitrary Ranks**. Data is automatically mapped to VTK's logical Row-Major order.
 ```cpp
 // Contiguous View (Fast Path)
 Kokkos::View<double*[3], Kokkos::LayoutRight, Kokkos::HostSpace> points("pts", N);
 writer.setPoints(microvtk::adapt(points));
 
-// Non-Contiguous View (Logical Indexing Path)
-Kokkos::View<double*[3], Kokkos::LayoutLeft, Kokkos::HostSpace> column_major("data", N);
-writer.addPointData("Pressure", microvtk::adapt(column_major));
+// Non-Contiguous / High-Rank View (Logical Indexing Path)
+// E.g., a Rank 3 Tensor field (N x 3 x 3)
+Kokkos::View<double*[3][3], Kokkos::LayoutLeft, Kokkos::HostSpace> tensors("data", N);
+writer.addPointData("Stress", microvtk::adapt(tensors));
 ```
 
 #### Cabana AoSoA
-Write flattened data from Cabana slices. It automatically handles the conversion from AoSoA layouts to the flat scalar ranges required by VTK.
+Write flattened data from Cabana slices. It automatically handles the conversion from AoSoA layouts to the flat scalar ranges required by VTK, including support for **multidimensional array** members.
 ```cpp
-using MemberTypes = Cabana::MemberTypes<double[3], double>;
+// Slice with a 3x3 tensor member
+using MemberTypes = Cabana::MemberTypes<double[3][3], double>;
 Cabana::AoSoA<MemberTypes, Kokkos::HostSpace> aosoa("data", N);
-auto pos_slice = Cabana::slice<0>(aosoa);
+auto stress_slice = Cabana::slice<0>(aosoa);
 
-// Automatically flattens the N x [3] slice into a flat 3N range
-writer.setPoints(microvtk::adapt(pos_slice));
+// Automatically flattens the N x [3][3] slice into a flat 9N range
+writer.addPointData("Stress", microvtk::adapt(stress_slice));
 ```
 
 ### 4. Time Series (.pvd)

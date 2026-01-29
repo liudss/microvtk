@@ -106,6 +106,37 @@ TEST(KokkosAdapterTest, AdaptView2D_LayoutStride) {
   // Row 3
   EXPECT_DOUBLE_EQ(*it++, 3.0);
 }
+
+TEST(KokkosAdapterTest, AdaptViewRank3LayoutLeft) {
+  // Rank 3, LayoutLeft (Column Major in 3D)
+  // (N, 3, 3)
+  Kokkos::View<double* [3][3], Kokkos::LayoutLeft, Kokkos::HostSpace> view("v3",
+                                                                           5);
+
+  // Fill data to verify logical order
+  // Logical: Tuple i, Comp (r, c)
+  // Value = i * 100 + r * 10 + c
+  for (int i = 0; i < 5; ++i) {
+    for (int r = 0; r < 3; ++r) {
+      for (int c = 0; c < 3; ++c) {
+        view(i, r, c) = i * 100.0 + r * 10.0 + c;
+      }
+    }
+  }
+
+  auto range = microvtk::adapt(view);
+  EXPECT_EQ(std::ranges::size(range), 5 * 9);
+
+  // Verify values in logical Row-Major order
+  auto it = std::ranges::begin(range);
+  for (int i = 0; i < 5; ++i) {
+    for (int r = 0; r < 3; ++r) {
+      for (int c = 0; c < 3; ++c) {
+        EXPECT_DOUBLE_EQ(*it++, i * 100.0 + r * 10.0 + c);
+      }
+    }
+  }
+}
 #endif
 
 #ifdef MICROVTK_HAS_CABANA
@@ -153,5 +184,35 @@ TEST(CabanaAdapterTest, AdaptSliceArray) {
 
   // 1st point (flat index 3, 4, 5)
   EXPECT_DOUBLE_EQ(it[3], 11.0);
+}
+
+TEST(CabanaAdapterTest, AdaptSliceMultiDimArray) {
+  // Tensor 3x3
+  using DataTypes = Cabana::MemberTypes<double[3][3]>;
+  const int num_tuples = 5;
+  Cabana::AoSoA<DataTypes, Kokkos::HostSpace> aosoa("aosoa", num_tuples);
+  auto slice = Cabana::slice<0>(aosoa);
+
+  for (int i = 0; i < num_tuples; ++i) {
+    for (int r = 0; r < 3; ++r) {
+      for (int c = 0; c < 3; ++c) {
+        slice(i, r, c) = i * 100.0 + r * 10.0 + c;
+      }
+    }
+  }
+
+  auto flattened = microvtk::adapt(slice);
+
+  // Check size: 5 tuples * 9 components = 45
+  EXPECT_EQ(flattened.size(), 45);
+
+  auto it = flattened.begin();
+  for (int i = 0; i < num_tuples; ++i) {
+    for (int r = 0; r < 3; ++r) {
+      for (int c = 0; c < 3; ++c) {
+        EXPECT_DOUBLE_EQ(*it++, i * 100.0 + r * 10.0 + c);
+      }
+    }
+  }
 }
 #endif

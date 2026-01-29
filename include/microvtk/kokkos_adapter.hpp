@@ -44,25 +44,39 @@ template <typename DataType, typename... Properties>
     return std::span(view.data(), view.span());
   } else {
     // Slow Path: Logical indexing via Transform View
-    // Supports Rank 1 (Strided) and Rank 2 (LayoutLeft/Strided).
-    static_assert(Rank <= 2,
-                  "MicroVTK: Only Rank 1 and 2 supported for non-contiguous "
-                  "layouts.");
-
+    // Supports arbitrary Rank and non-contiguous layouts (e.g. LayoutLeft).
+    // We map the flat index 'k' to logical indices (i0, i1, ...) assuming
+    // Row-Major order (VTK standard).
     size_t total_size = view.size();
 
-    // Capture view by value
     return std::views::iota(size_t{0}, total_size) |
-           std::views::transform([view](size_t k) ->
-                                 typename ViewType::non_const_value_type {
-                                   if constexpr (Rank == 1) {
-                                     return view(k);
-                                   } else {
-                                     // Rank 2
-                                     size_t cols = view.extent(1);
-                                     return view(k / cols, k % cols);
-                                   }
-                                 });
+           std::views::transform(
+               [view](size_t k) -> typename ViewType::non_const_value_type {
+                 if constexpr (Rank == 1) {
+                   return view(k);
+                 } else if constexpr (Rank == 2) {
+                   size_t cols = view.extent(1);
+                   return view(k / cols, k % cols);
+                 } else {
+                   // Generic Rank > 2
+                   // Map flat index k to (i0, i1, ... iR)
+                   // i_last = k % extent_last; k /= extent_last; ...
+                   size_t indices[Rank];
+                   size_t temp = k;
+
+                   // Compute indices from last dimension to first
+                   for (size_t d = Rank - 1; d > 0; --d) {
+                     indices[d] = temp % view.extent(d);
+                     temp /= view.extent(d);
+                   }
+                   indices[0] = temp;
+
+                   // Apply indices to view
+                   return [&]<size_t... Is>(std::index_sequence<Is...>) {
+                     return view(indices[Is]...);
+                   }(std::make_index_sequence<Rank>{});
+                 }
+               });
   }
 }
 

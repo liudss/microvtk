@@ -25,11 +25,7 @@ public:
   using ScalarType = std::remove_all_extents_t<ValueType>;
 
   static constexpr size_t get_num_components() {
-    if constexpr (std::is_array_v<ValueType>) {
-      return std::extent_v<ValueType>;
-    } else {
-      return 1;
-    }
+    return sizeof(ValueType) / sizeof(ScalarType);
   }
 
   static constexpr size_t NumComponents = get_num_components();
@@ -63,7 +59,38 @@ public:
       requires(R > 0)
     [[nodiscard]] reference access(std::integral_constant<size_t, R>,
                                    size_t t_idx, size_t c_idx) const {
-      return (*s)(t_idx, c_idx);
+      if constexpr (R == 1) {
+        // Optimization for 1D array
+        return (*s)(t_idx, c_idx);
+      } else {
+        // Generic Multidimensional Array (Tensor)
+        // Map flat component index c_idx to (d0, d1...)
+        // ValueType is e.g. double[3][3]
+        using T = ValueType;
+        size_t indices[R];
+        size_t temp = c_idx;
+
+        // Compute indices from last dimension to first
+        // We need extents of each dimension of T
+        auto compute_idx = [&]<size_t... Is>(std::index_sequence<Is...>) {
+          auto compute_one = [&](auto i_rev) {
+            constexpr size_t d = R - 1 - i_rev;
+            if constexpr (d > 0) {
+              constexpr size_t ext = std::extent_v<T, d>;
+              indices[d] = temp % ext;
+              temp /= ext;
+            } else {
+              indices[0] = temp;
+            }
+          };
+          (compute_one(std::integral_constant<size_t, Is>{}), ...);
+        };
+        compute_idx(std::make_index_sequence<R>{});
+
+        return [&]<size_t... Is>(std::index_sequence<Is...>) {
+          return (*s)(t_idx, indices[Is]...);
+        }(std::make_index_sequence<R>{});
+      }
     }
 
     [[nodiscard]] reference operator*() const {

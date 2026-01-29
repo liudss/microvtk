@@ -51,7 +51,8 @@ A high-performance XML generator that uses `std::format` and RAII-based `ScopedE
 - `microvtk::view(container)`: Returns a `std::span` for contiguous memory.
 - `microvtk::adapt(container, &Member)`: Uses `std::views::transform` to expose a specific member from an Array-of-Structures (AoS).
 - **HPC Adapters**: Specialized support for `Kokkos::View` and `Cabana::Slice`.
-    - **Kokkos**: Supports `LayoutRight`, `LayoutLeft`, and `LayoutStride`. Contiguous layouts use a fast `std::span` path, while non-contiguous layouts (e.g., Rank 2 `LayoutLeft`) use a C++20 `std::views::transform` path to ensure logical indexing order.
+    - **Kokkos**: Supports `LayoutRight`, `LayoutLeft`, and `LayoutStride`. Contiguous layouts use a fast `std::span` path, while non-contiguous layouts use a C++20 `std::views::transform` path to ensure logical Row-Major indexing order for **arbitrary Ranks**.
+    - **Cabana**: Automatically flattens slices, including support for **multidimensional array (tensor)** member types by mapping flat component indices to nested array indices.
 
 ## 5. Data Formats & Modes
 

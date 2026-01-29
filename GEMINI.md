@@ -66,8 +66,8 @@ microvtk/
 
 ### Phase 3: HPC Adapters (Updated)
 - Native adapters for **Kokkos Views** and **Cabana Slices**.
-- **Kokkos**: Automatic dispatch between fast path (`std::span`) and logical indexing path (`std::views::transform`) to support all layouts including `LayoutLeft` and `LayoutStride` (Rank 1 & 2).
-- **Cabana**: Automatic flattening of AoSoA slices.
+- **Kokkos**: Automatic dispatch between fast path (`std::span`) and logical indexing path (`std::views::transform`) to support all layouts including `LayoutLeft` and `LayoutStride` for **arbitrary Ranks**.
+- **Cabana**: Automatic flattening of AoSoA slices, including support for **multidimensional array (tensor) members**.
 
 ### Phase 4: VTU Writer (Completed)
 - Implemented **Streaming Mode**.
