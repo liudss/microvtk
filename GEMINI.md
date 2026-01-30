@@ -64,7 +64,7 @@ microvtk/
 
 ## 4. Implementation Status
 
-### Phase 3: HPC Adapters (Updated)
+### Phase 3: HPC Adapters (Completed)
 - Native adapters for **Kokkos Views** and **Cabana Slices**.
 - **Kokkos**: Automatic dispatch between fast path (`std::span`) and logical indexing path (`std::views::transform`) to support all layouts including `LayoutLeft` and `LayoutStride` for **arbitrary Ranks**.
 - **Cabana**: Automatic flattening of AoSoA slices, including support for **multidimensional array (tensor) members**.
@@ -82,6 +82,7 @@ microvtk/
 ### Phase 6: Integration Testing (Completed)
 - Automated compatibility verification using official VTK Python library.
 - Dependency management using `uv`.
+- **Memory Safety**: Integration with **Valgrind** in CI to detect memory leaks and undefined behavior.
 - GitHub Actions integration for both Linux and Windows.
 
 ---
@@ -90,10 +91,11 @@ microvtk/
 
 * **Namespace:** `namespace microvtk`.
 * **Safety:** Size validation on topology arrays. `noexcept` specifications on performance-critical adapters.
-* **Testing:**
-    * Comprehensive unit tests covering edge cases.
-    * **Integration Gate**: All generated files must be readable by official VTK bindings.
-* **Coverage:** Target >85% (excluding platform-specific endian logic).
+*   **Testing:**
+    *   Comprehensive unit tests covering edge cases.
+    *   **Integration Gate**: All generated files must be readable by official VTK bindings.
+    *   **Memory Gate**: CI must pass Valgrind checks with zero errors and zero leaks.
+*   **Coverage:** Target >85% (excluding platform-specific endian logic).
 
 ---
 

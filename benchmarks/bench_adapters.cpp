@@ -29,9 +29,10 @@ static void BM_Vector_Iterate(benchmark::State& state) {
     }
     benchmark::DoNotOptimize(sum);
   }
-  state.SetBytesProcessed(state.iterations() * size * sizeof(double));
+  state.SetBytesProcessed(static_cast<int64_t>(state.iterations()) *
+                          static_cast<int64_t>(size) * sizeof(double));
 }
-BENCHMARK(BM_Vector_Iterate)->Range(1024, 1024 * 1024);
+BENCHMARK(BM_Vector_Iterate)->Range(1024, 1024LL * 1024LL);
 
 // ----------------------------------------------------------------------------
 // Kokkos Benchmarks
@@ -47,7 +48,7 @@ static void BM_Kokkos_Adapt_1D(benchmark::State& state) {
     benchmark::DoNotOptimize(span);
   }
 }
-BENCHMARK(BM_Kokkos_Adapt_1D)->Range(1024, 1024 * 1024);
+BENCHMARK(BM_Kokkos_Adapt_1D)->Range(1024, 1024LL * 1024LL);
 
 static void BM_Kokkos_Iterate_1D(benchmark::State& state) {
   size_t size = state.range(0);
@@ -65,20 +66,22 @@ static void BM_Kokkos_Iterate_1D(benchmark::State& state) {
     }
     benchmark::DoNotOptimize(sum);
   }
-  state.SetBytesProcessed(state.iterations() * size * sizeof(double));
+  state.SetBytesProcessed(static_cast<int64_t>(state.iterations()) *
+                          static_cast<int64_t>(size) * sizeof(double));
 }
-BENCHMARK(BM_Kokkos_Iterate_1D)->Range(1024, 1024 * 1024);
+BENCHMARK(BM_Kokkos_Iterate_1D)->Range(1024, 1024LL * 1024LL);
 
 static void BM_Kokkos_Iterate_2D(benchmark::State& state) {
   size_t num_tuples = state.range(0);
+  // NOLINTNEXTLINE(modernize-avoid-c-arrays)
   Kokkos::View<double* [3], Kokkos::LayoutRight, Kokkos::HostSpace> view(
       "v", num_tuples);
 
   // Fill data
   for (size_t i = 0; i < num_tuples; ++i) {
-    view(i, 0) = i;
-    view(i, 1) = i;
-    view(i, 2) = i;
+    view(i, 0) = static_cast<double>(i);
+    view(i, 1) = static_cast<double>(i);
+    view(i, 2) = static_cast<double>(i);
   }
 
   auto span = microvtk::adapt(view);
@@ -91,22 +94,24 @@ static void BM_Kokkos_Iterate_2D(benchmark::State& state) {
     }
     benchmark::DoNotOptimize(sum);
   }
-  state.SetBytesProcessed(state.iterations() * total_size * sizeof(double));
+  state.SetBytesProcessed(static_cast<int64_t>(state.iterations()) *
+                          static_cast<int64_t>(total_size) * sizeof(double));
 }
-BENCHMARK(BM_Kokkos_Iterate_2D)->Range(1024, 1024 * 1024);
+BENCHMARK(BM_Kokkos_Iterate_2D)->Range(1024, 1024LL * 1024LL);
 
 static void BM_Kokkos_Iterate_2D_LayoutLeft(benchmark::State& state) {
   size_t num_tuples = state.range(0);
   // LayoutLeft: Column Major (Not C-contiguous for rank 2 if we view it as
   // array of structs)
+  // NOLINTNEXTLINE(modernize-avoid-c-arrays)
   Kokkos::View<double* [3], Kokkos::LayoutLeft, Kokkos::HostSpace> view(
       "v_ll", num_tuples);
 
   // Fill data
   for (size_t i = 0; i < num_tuples; ++i) {
-    view(i, 0) = i;
-    view(i, 1) = i;
-    view(i, 2) = i;
+    view(i, 0) = static_cast<double>(i);
+    view(i, 1) = static_cast<double>(i);
+    view(i, 2) = static_cast<double>(i);
   }
 
   // This should trigger the Slow Path (iota | transform)
@@ -121,9 +126,10 @@ static void BM_Kokkos_Iterate_2D_LayoutLeft(benchmark::State& state) {
     }
     benchmark::DoNotOptimize(sum);
   }
-  state.SetBytesProcessed(state.iterations() * total_size * sizeof(double));
+  state.SetBytesProcessed(static_cast<int64_t>(state.iterations()) *
+                          static_cast<int64_t>(total_size) * sizeof(double));
 }
-BENCHMARK(BM_Kokkos_Iterate_2D_LayoutLeft)->Range(1024, 1024 * 1024);
+BENCHMARK(BM_Kokkos_Iterate_2D_LayoutLeft)->Range(1024, 1024LL * 1024LL);
 
 #endif  // MICROVTK_HAS_KOKKOS
 
@@ -143,7 +149,7 @@ static void BM_Cabana_Adapt_Scalar(benchmark::State& state) {
     benchmark::DoNotOptimize(flattened);
   }
 }
-BENCHMARK(BM_Cabana_Adapt_Scalar)->Range(1024, 1024 * 1024);
+BENCHMARK(BM_Cabana_Adapt_Scalar)->Range(1024, 1024LL * 1024LL);
 
 static void BM_Cabana_Iterate_Scalar(benchmark::State& state) {
   size_t num_tuples = state.range(0);
@@ -152,7 +158,7 @@ static void BM_Cabana_Iterate_Scalar(benchmark::State& state) {
   auto slice = Cabana::slice<0>(aosoa);
 
   // Fill
-  for (size_t i = 0; i < num_tuples; ++i) slice(i) = (double)i;
+  for (size_t i = 0; i < num_tuples; ++i) slice(i) = static_cast<double>(i);
 
   auto flattened = microvtk::adapt(slice);
 
@@ -163,21 +169,23 @@ static void BM_Cabana_Iterate_Scalar(benchmark::State& state) {
     }
     benchmark::DoNotOptimize(sum);
   }
-  state.SetBytesProcessed(state.iterations() * num_tuples * sizeof(double));
+  state.SetBytesProcessed(static_cast<int64_t>(state.iterations()) *
+                          static_cast<int64_t>(num_tuples) * sizeof(double));
 }
-BENCHMARK(BM_Cabana_Iterate_Scalar)->Range(1024, 1024 * 1024);
+BENCHMARK(BM_Cabana_Iterate_Scalar)->Range(1024, 1024LL * 1024LL);
 
 static void BM_Cabana_Iterate_Array(benchmark::State& state) {
   size_t num_tuples = state.range(0);
+  // NOLINTNEXTLINE(modernize-avoid-c-arrays)
   using DataTypes = Cabana::MemberTypes<double[3]>;
   Cabana::AoSoA<DataTypes, Kokkos::HostSpace> aosoa("aosoa", num_tuples);
   auto slice = Cabana::slice<0>(aosoa);
 
   // Fill
   for (size_t i = 0; i < num_tuples; ++i) {
-    slice(i, 0) = (double)i;
-    slice(i, 1) = (double)i;
-    slice(i, 2) = (double)i;
+    slice(i, 0) = static_cast<double>(i);
+    slice(i, 1) = static_cast<double>(i);
+    slice(i, 2) = static_cast<double>(i);
   }
 
   auto flattened = microvtk::adapt(slice);
@@ -190,9 +198,11 @@ static void BM_Cabana_Iterate_Array(benchmark::State& state) {
     }
     benchmark::DoNotOptimize(sum);
   }
-  state.SetBytesProcessed(state.iterations() * total_elements * sizeof(double));
+  state.SetBytesProcessed(static_cast<int64_t>(state.iterations()) *
+                          static_cast<int64_t>(total_elements) *
+                          sizeof(double));
 }
-BENCHMARK(BM_Cabana_Iterate_Array)->Range(1024, 1024 * 1024);
+BENCHMARK(BM_Cabana_Iterate_Array)->Range(1024, 1024LL * 1024LL);
 
 #endif  // MICROVTK_HAS_CABANA
 

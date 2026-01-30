@@ -225,7 +225,10 @@ private:
   template <std::ranges::range R>
   DataBlockInfo registerData(const R& data, std::string_view name,
                              int numComponents) {
-    using T = std::ranges::range_value_t<R>;
+    // Wrap in view to ensure zero-copy (stores reference)
+    auto view = std::views::all(data);
+    using ViewType = decltype(view);
+    using T = std::ranges::range_value_t<ViewType>;
 
     DataBlockInfo info;
     info.name = name;
@@ -234,7 +237,8 @@ private:
     info.numComponents = numComponents;
     info.valid = true;
 
-    auto accessor = std::make_unique<core::RangeAccessor<R>>(data);
+    auto accessor =
+        std::make_unique<core::RangeAccessor<ViewType>>(std::move(view));
     uint64_t payloadSize = accessor->size_bytes();
     currentOffset_ += sizeof(uint64_t) + payloadSize;
     accessors_.push_back(std::move(accessor));

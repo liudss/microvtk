@@ -3,9 +3,11 @@
 #ifdef MICROVTK_HAS_KOKKOS
 #include <Kokkos_Core.hpp>
 #include <algorithm>
+#include <array>
 #include <ranges>
 #include <span>
 #include <type_traits>
+#include <utility>
 
 namespace microvtk {
 
@@ -50,33 +52,36 @@ template <typename DataType, typename... Properties>
     size_t total_size = view.size();
 
     return std::views::iota(size_t{0}, total_size) |
-           std::views::transform(
-               [view](size_t k) -> typename ViewType::non_const_value_type {
-                 if constexpr (Rank == 1) {
-                   return view(k);
-                 } else if constexpr (Rank == 2) {
-                   size_t cols = view.extent(1);
-                   return view(k / cols, k % cols);
-                 } else {
-                   // Generic Rank > 2
-                   // Map flat index k to (i0, i1, ... iR)
-                   // i_last = k % extent_last; k /= extent_last; ...
-                   size_t indices[Rank];
-                   size_t temp = k;
+           std::views::transform([view, Rank](size_t k) ->
+                                 typename ViewType::non_const_value_type {
+                                   if constexpr (Rank == 1) {
+                                     return view(k);
+                                   } else if constexpr (Rank == 2) {
+                                     size_t cols = view.extent(1);
+                                     return view(k / cols, k % cols);
+                                   } else {
+                                     // Generic Rank > 2
+                                     // Map flat index k to (i0, i1, ... iR)
+                                     // i_last = k % extent_last; k /=
+                                     // extent_last; ...
+                                     std::array<size_t, Rank> indices;
+                                     size_t temp = k;
 
-                   // Compute indices from last dimension to first
-                   for (size_t d = Rank - 1; d > 0; --d) {
-                     indices[d] = temp % view.extent(d);
-                     temp /= view.extent(d);
-                   }
-                   indices[0] = temp;
+                                     // Compute indices from last dimension to
+                                     // first
+                                     for (size_t d = Rank - 1; d > 0; --d) {
+                                       indices[d] = temp % view.extent(d);
+                                       temp /= view.extent(d);
+                                     }
+                                     indices[0] = temp;
 
-                   // Apply indices to view
-                   return [&]<size_t... Is>(std::index_sequence<Is...>) {
-                     return view(indices[Is]...);
-                   }(std::make_index_sequence<Rank>{});
-                 }
-               });
+                                     // Apply indices to view
+                                     return [&]<size_t... Is>(
+                                                std::index_sequence<Is...>) {
+                                       return view(indices[Is]...);
+                                     }(std::make_index_sequence<Rank>{});
+                                   }
+                                 });
   }
 }
 
