@@ -8,7 +8,7 @@
 
 > **Key Philosophy:** "Your data stays where it is. We just stream it to disk."
 
-## 🚀 Key Features
+## Key Features
 
 | Feature | Description |
 | :--- | :--- |
@@ -21,7 +21,7 @@
 
 ---
 
-## 📦 Integration
+## Integration
 
 MicroVTK is designed as a **header-only** library. The recommended way to use it is via CMake `add_subdirectory`.
 
@@ -45,7 +45,7 @@ target_link_libraries(my_simulation PRIVATE microvtk::microvtk)
 
 ---
 
-## 💡 Usage Examples
+## Usage Examples
 
 ### 1. Basic Unstructured Grid (.vtu)
 Stream standard C++ vectors directly to a VTU file.
@@ -126,7 +126,7 @@ for (int step = 0; step < 100; ++step) {
 
 ---
 
-## 🛠️ Building & Testing
+## Building & Testing
 
 ### Requirements
 *   **Compiler**: GCC 13+, Clang 16+, MSVC 19.34+ (C++20 compliant)
@@ -170,7 +170,7 @@ uv run pytest tests/integration
 
 ---
 
-## 📂 Project Structure
+## Project Structure
 
 ```text
 microvtk/
@@ -185,6 +185,6 @@ microvtk/
 └── external/               # Third-party dependencies (Submodules)
 ```
 
-## 📄 License
+## License
 
 This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) file for details.
