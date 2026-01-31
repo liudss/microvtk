@@ -14,6 +14,7 @@
 
 // Writers
 #include <microvtk/pvd_writer.hpp>
+#include <microvtk/vti_writer.hpp>
 #include <microvtk/vtu_writer.hpp>
 
 namespace microvtk {
