@@ -32,16 +32,19 @@ TEST(VtiWriter, SimpleWrite) {
   // Verify file exists
   ASSERT_TRUE(std::filesystem::exists(filename));
 
-  std::ifstream ifs(filename);
-  std::string content((std::istreambuf_iterator<char>(ifs)),
-                      (std::istreambuf_iterator<char>()));
+  {
+    std::ifstream ifs(filename);
+    std::string content((std::istreambuf_iterator<char>(ifs)),
+                        (std::istreambuf_iterator<char>()));
 
-  EXPECT_TRUE(content.find("<VTKFile") != std::string::npos);
-  EXPECT_TRUE(content.find("type=\"ImageData\"") != std::string::npos);
-  EXPECT_TRUE(content.find("WholeExtent=\"0 1 0 1 0 0\"") != std::string::npos);
-  EXPECT_TRUE(content.find("AppendedData") != std::string::npos);
-  EXPECT_TRUE(content.find("PointScalars") != std::string::npos);
-  EXPECT_TRUE(content.find("CellID") != std::string::npos);
+    EXPECT_TRUE(content.find("<VTKFile") != std::string::npos);
+    EXPECT_TRUE(content.find("type=\"ImageData\"") != std::string::npos);
+    EXPECT_TRUE(content.find("WholeExtent=\"0 1 0 1 0 0\"") !=
+                std::string::npos);
+    EXPECT_TRUE(content.find("AppendedData") != std::string::npos);
+    EXPECT_TRUE(content.find("PointScalars") != std::string::npos);
+    EXPECT_TRUE(content.find("CellID") != std::string::npos);
+  }
 
   // Cleanup
   std::filesystem::remove(filename);
@@ -61,12 +64,14 @@ TEST(VtiWriter, Compression) {
 
   ASSERT_TRUE(std::filesystem::exists(filename));
 
-  std::ifstream ifs(filename);
-  std::string content((std::istreambuf_iterator<char>(ifs)),
-                      (std::istreambuf_iterator<char>()));
+  {
+    std::ifstream ifs(filename);
+    std::string content((std::istreambuf_iterator<char>(ifs)),
+                        (std::istreambuf_iterator<char>()));
 
-  EXPECT_TRUE(content.find("compressor=\"vtkZLibDataCompressor\"") !=
-              std::string::npos);
+    EXPECT_TRUE(content.find("compressor=\"vtkZLibDataCompressor\"") !=
+                std::string::npos);
+  }
 
   std::filesystem::remove(filename);
 }
