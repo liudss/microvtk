@@ -1,7 +1,7 @@
 # MicroVTK Specification
 
 ## 1. Overview
-`MicroVTK` is a lightweight, header-only, modern C++20 library designed for high-performance exporting of VTK data files. It focuses on the XML UnstructuredGrid (`.vtu`) and Time-Series Collection (`.pvd`) formats, utilizing a zero-copy streaming architecture to minimize memory overhead.
+`MicroVTK` is a lightweight, header-only, modern C++20 library designed for high-performance exporting of VTK data files. It focuses on XML formats: UnstructuredGrid (`.vtu`), ImageData (`.vti`), and Time-Series Collection (`.pvd`), utilizing a zero-copy streaming architecture to minimize memory overhead.
 
 ## 2. Design Goals
 - **C++20 Native:** Leverage Concepts, Spans, Ranges, and `std::format`.
@@ -33,6 +33,7 @@ microvtk/
 │   ├── cabana_adapter.hpp   # Adapter for Cabana slices
 │   ├── kokkos_adapter.hpp   # Adapter for Kokkos Views
 │   ├── vtu_writer.hpp       # Main UnstructuredGrid writer
+│   ├── vti_writer.hpp       # ImageData (Structured Grid) writer
 │   ├── pvd_writer.hpp       # Time-series manager
 │   └── microvtk.hpp         # Master header
 ```
@@ -58,11 +59,8 @@ A high-performance XML generator that uses `std::format` and RAII-based `ScopedE
 
 ### 5.1 Supported Formats
 - **VTU (.vtu):** XML UnstructuredGrid.
+- **VTI (.vti):** XML ImageData (Structured Grids).
 - **PVD (.pvd):** XML VTK Data Grouping (Time Series).
-
-### 5.2 Storage Modes
-- **Appended (Primary):** Metadata in XML, raw binary data appended at the end. Recommended for performance.
-- **Compression:** Supports ZLib and LZ4 compression in Appended mode.
 
 ## 6. API Reference
 
@@ -77,12 +75,17 @@ Main class for writing `.vtu` files.
 - `setCompression(type)`: Set `CompressionType::ZLib`, `LZ4`, or `None`.
 - `write(filename)`: Execute the write operation.
 
-### 6.2 `microvtk::PvdWriter`
-Manager for multi-step simulations.
+### 6.2 `microvtk::VtiWriter`
+Main class for writing `.vti` files.
 
 #### Methods:
-- `addStep(time, vtu_filename)`: Register a simulation step.
-- `save()`: Write the `.pvd` file.
+- `VtiWriter(extent, origin, spacing)`: Constructor. Extent is `[xmin, xmax, ymin, ymax, zmin, zmax]`.
+- `addPointData(name, range, numComponents)`: Add point attributes.
+- `addCellData(name, range, numComponents)`: Add cell attributes.
+- `setCompression(type)`: Set compression type.
+- `write(filename)`: Execute the write operation.
+
+### 6.3 `microvtk::PvdWriter`
 
 ## 7. Implementation Details
 

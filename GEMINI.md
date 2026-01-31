@@ -75,12 +75,17 @@ microvtk/
 - Support for Points, Cells (Topology), PointData, and CellData attributes.
 - Built-in validation for array size consistency.
 
-### Phase 5: PVD Writer (Completed)
+### Phase 5: VTI Writer & Adapt support (Completed)
+- Support for **ImageData** (.vti) with structured grids (Extent, Origin, Spacing).
+- Full compatibility with `microvtk::adapt()` for writing from Array-of-Structs (AoS).
+- Zero-copy streaming and compression support.
+
+### Phase 6: PVD Writer (Completed)
 - Support for multi-step time series.
 - **Explicit Save**: Performance-optimized to avoid redundant I/O during simulation loops.
 
-### Phase 6: Integration Testing (Completed)
-- Automated compatibility verification using official VTK Python library.
+### Phase 7: Integration Testing (Completed)
+- Automated compatibility verification using official VTK Python library for all formats (VTU, VTI, PVD).
 - Dependency management using `uv`.
 - **Memory Safety**: Integration with **Valgrind** in CI to detect memory leaks and undefined behavior.
 - GitHub Actions integration for both Linux and Windows.
@@ -104,28 +109,23 @@ microvtk/
 ```cpp
 using namespace microvtk;
 
-// 1. Setup Writer
+// 1. Unstructured Grid (.vtu)
 VtuWriter writer;
-
-// 2. Data (Zero Copy - References stored)
 std::vector<double> points = { ... };
 writer.setPoints(points);
-
-// 3. Topology (Validation included)
-std::vector<int32_t> conn = { ... };
-std::vector<int32_t> offsets = { ... };
-std::vector<uint8_t> types = { ... };
-writer.setCells(conn, offsets, types);
-
-// 4. Attributes (AoS supported)
-struct Particle { double mass; };
-std::vector<Particle> parts = ...;
-writer.addPointData("Mass", adapt(parts, &Particle::mass));
-
-// 5. Write to disk (Direct stream from 'points', 'conn', etc.)
+// ... set cells ...
 writer.write("output.vtu");
 
-// 6. Time Series
+// 2. Image Data (.vti) with AoS adaptation
+std::array<int, 6> extent = {0, 9, 0, 9, 0, 0};
+VtiWriter vti(extent);
+
+struct Pixel { double val; };
+std::vector<Pixel> data(100);
+vti.addPointData("Val", adapt(data, &Pixel::val));
+vti.write("image.vti");
+
+// 3. Time Series (.pvd)
 PvdWriter pvd("sim.pvd");
 pvd.addStep(0.0, "step0.vtu");
 pvd.save(); // Explicit save for performance
