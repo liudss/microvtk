@@ -117,3 +117,11 @@ def hpc_vtu_file():
     run_example("example_hpc", [output])
     yield output
     if os.path.exists(output): os.remove(output)
+
+@pytest.fixture(scope="module")
+def vti_adapt_file():
+    """Runs example_vti_adapt and yields the path."""
+    output = "vti_adapt.vti"
+    run_example("example_vti_adapt", [output])
+    yield output
+    if os.path.exists(output): os.remove(output)

@@ -201,6 +201,7 @@ if(MICROVTK_BUILD_TESTS)
             tests/test_binary_utils.cpp
             tests/test_adapter.cpp
             tests/test_vtu_writer.cpp
+            tests/test_vti_writer.cpp
             tests/test_pvd_writer.cpp
             tests/test_vtu_validation.cpp
             tests/test_coverage_gap.cpp
@@ -244,6 +245,10 @@ if(MICROVTK_BUILD_EXAMPLES)
     add_executable(example_compression examples/compression.cpp)
     target_link_libraries(example_compression PRIVATE microvtk)
     microvtk_set_strict_warnings(example_compression)
+
+    add_executable(example_vti_adapt examples/vti_adapt.cpp)
+    target_link_libraries(example_vti_adapt PRIVATE microvtk)
+    microvtk_set_strict_warnings(example_vti_adapt)
 
     if(MICROVTK_USE_KOKKOS)
         add_executable(example_hpc examples/hpc_adapters.cpp)

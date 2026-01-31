@@ -13,6 +13,7 @@
 | Feature | Description |
 | :--- | :--- |
 | **Zero-Copy Streaming** | Data is streamed directly from user memory to disk. No intermediate buffers, no redundant copies. |
+| **VTU & VTI Support** | Supports both **Unstructured Grids** (`.vtu`) and **Structured Image Data** (`.vti`). |
 | **Modern C++20** | Built with Concepts, Ranges, Spans, and `std::format` for a type-safe and expressive API. |
 | **HPC Ready** | Native adapters for **Kokkos Views** (arbitrary Rank/Layout) and **Cabana Slices** (SoA/AoS/Tensor). |
 | **Compression** | Transparent support for **ZLIB** and **LZ4** compression to reduce I/O bottlenecks. |
@@ -75,7 +76,31 @@ int main() {
 }
 ```
 
-### 2. High-Performance Computing (Kokkos)
+### 2. Structured Image Data (.vti)
+Define a uniform grid (image) using extent, origin, and spacing. Use the `adapt()` utility to write from an Array-of-Structs (AoS).
+
+```cpp
+#include <microvtk/microvtk.hpp>
+#include <vector>
+
+struct Pixel { double value; int id; };
+
+int main() {
+    // 10x10x1 grid
+    std::array<int, 6> extent = {0, 9, 0, 9, 0, 0};
+    microvtk::VtiWriter writer(extent);
+
+    std::vector<Pixel> data = ...; // 100 pixels
+
+    // Use adapt() to extract members from AoS without copying
+    writer.addPointData("Intensity", microvtk::adapt(data, &Pixel::value));
+    writer.addPointData("ID", microvtk::adapt(data, &Pixel::id));
+
+    writer.write("image.vti");
+}
+```
+
+### 3. High-Performance Computing (Kokkos)
 Handle complex, multi-dimensional array layouts automatically. MicroVTK maps logical indices to VTK's expected order without data replication.
 
 ```cpp
@@ -178,6 +203,7 @@ microvtk/
 │   ├── common/             # Concepts, Types, Enums
 │   ├── core/               # Streaming logic, Compression, XML Builders
 │   ├── vtu_writer.hpp      # UnstructuredGrid Writer
+│   ├── vti_writer.hpp      # ImageData (Structured Grid) Writer
 │   ├── pvd_writer.hpp      # Time Series Writer
 │   └── *_adapter.hpp       # Data Adapters (std, Kokkos, Cabana)
 ├── examples/               # Example usages (Basic, HPC, Compression)
