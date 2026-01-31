@@ -48,10 +48,11 @@ microvtk/
 │       │   └── xml_utils.hpp     # std::format based XML builder
 │       ├── vtu_writer.hpp    # Main UnstructuredGrid Writer (Streaming)
 │       ├── pvd_writer.hpp    # Time Series Writer (Explicit Save)
-│       ├── adapter.hpp       # Data Adapters (AoS support)
-│       ├── cabana_adapter.hpp # Cabana Adapter
-│       ├── kokkos_adapter.hpp # Kokkos Adapter
-│       └── microvtk.hpp      # Main entry header
+       ├── adapter.hpp       # Data Adapters (AoS support)
+       ├── cabana_adapter.hpp # Cabana Adapter
+       ├── kokkos_adapter.hpp # Kokkos Adapter
+       ├── indexing_adapter.hpp # Custom Indexing (Morton/Z-Curve)
+       └── microvtk.hpp      # Main entry header
 ├── tests/
 │   ├── integration/        # Python compatibility tests (Official VTK)
 │   └── ...                 # Unit tests (GTest)
@@ -90,6 +91,11 @@ microvtk/
 - **Memory Safety**: Integration with **Valgrind** in CI to detect memory leaks and undefined behavior.
 - GitHub Actions integration for both Linux and Windows.
 
+### Phase 8: Custom Indexing (Completed)
+- **Morton/Z-Curve**: Implemented zero-copy adapter for reordering Morton-coded data to Raster order.
+- **2D & 3D**: Automatic support for both 2D and 3D curves via function overloading.
+- **Hardware Acceleration**: Automatic utilization of **BMI2 (PDEP)** instructions for high-performance coordinate encoding when available (`-march=native`).
+
 ---
 
 ## 5. Coding Standards & Quality Gates
@@ -125,7 +131,12 @@ std::vector<Pixel> data(100);
 vti.addPointData("Val", adapt(data, &Pixel::val));
 vti.write("image.vti");
 
-// 3. Time Series (.pvd)
+// 3. Morton Order (Z-Curve)
+std::array<size_t, 3> dims = {128, 128, 128};
+auto view = morton_data | views::reorder_z_curve(dims);
+vti.addPointData("Temp", view);
+
+// 4. Time Series (.pvd)
 PvdWriter pvd("sim.pvd");
 pvd.addStep(0.0, "step0.vtu");
 pvd.save(); // Explicit save for performance

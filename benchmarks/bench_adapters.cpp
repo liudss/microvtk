@@ -1,4 +1,5 @@
 #include <benchmark/benchmark.h>
+#include <microvtk/indexing_adapter.hpp>
 #include <microvtk/microvtk.hpp>
 #include <numeric>
 #include <random>
@@ -33,6 +34,123 @@ static void BM_Vector_Iterate(benchmark::State& state) {
                           static_cast<int64_t>(size) * sizeof(double));
 }
 BENCHMARK(BM_Vector_Iterate)->Range(1024, 1024LL * 1024LL);
+
+// ----------------------------------------------------------------------------
+// Indexing Adapter Benchmarks (Morton / Z-Curve)
+// ----------------------------------------------------------------------------
+
+// 1. Manual Index Calculation (Reference for overhead)
+// Simulates what a user might write manually to iterate in Raster order
+// but access data stored in Morton order.
+static void BM_Indexing_Manual(benchmark::State& state) {
+  size_t n = static_cast<size_t>(std::cbrt(state.range(0)));
+  size_t size = n * n * n;  // ensure cube
+
+  std::vector<double> v(size);
+  std::iota(v.begin(), v.end(), 0.0);
+
+  for (auto _ : state) {
+    double sum = 0.0;
+    // Iterate in Raster Order (z, y, x nested loops flattened)
+    for (size_t i = 0; i < size; ++i) {
+      // Decode linear -> (x,y,z)
+      size_t z = i / (n * n);
+      size_t rem = i % (n * n);
+      size_t y = rem / n;
+      size_t x = rem % n;
+
+      // Encode (x,y,z) -> Morton
+      size_t morton_idx = microvtk::detail::morton_encode_3d(
+          static_cast<uint32_t>(x), static_cast<uint32_t>(y),
+          static_cast<uint32_t>(z));
+
+      sum += v[morton_idx];
+    }
+    benchmark::DoNotOptimize(sum);
+  }
+  state.SetBytesProcessed(static_cast<int64_t>(state.iterations()) *
+                          static_cast<int64_t>(size) * sizeof(double));
+}
+BENCHMARK(BM_Indexing_Manual)->Range(4096, 262144);  // 16^3 to 64^3 approx
+
+// 2. Adapter (View)
+// Measures the overhead of the abstraction layer
+static void BM_Indexing_Adapter(benchmark::State& state) {
+  size_t n = static_cast<size_t>(std::cbrt(state.range(0)));
+  size_t size = n * n * n;
+  std::array<size_t, 3> dims = {n, n, n};
+
+  std::vector<double> v(size);
+  std::iota(v.begin(), v.end(), 0.0);
+
+  // Create view once (lightweight)
+  auto view = v | microvtk::views::reorder_z_curve(dims);
+
+  for (auto _ : state) {
+    double sum = 0.0;
+    // The writer will iterate this view linearly
+    for (auto val : view) {
+      sum += val;
+    }
+    benchmark::DoNotOptimize(sum);
+  }
+  state.SetBytesProcessed(static_cast<int64_t>(state.iterations()) *
+                          static_cast<int64_t>(size) * sizeof(double));
+}
+BENCHMARK(BM_Indexing_Adapter)->Range(4096, 262144);
+
+// ----------------------------------------------------------------------------
+// Indexing Adapter Benchmarks (2D)
+// ----------------------------------------------------------------------------
+
+static void BM_Indexing_Manual_2D(benchmark::State& state) {
+  size_t n = static_cast<size_t>(std::sqrt(state.range(0)));
+  size_t size = n * n;
+
+  std::vector<double> v(size);
+  std::iota(v.begin(), v.end(), 0.0);
+
+  for (auto _ : state) {
+    double sum = 0.0;
+    for (size_t i = 0; i < size; ++i) {
+      // Decode linear -> (x,y)
+      size_t y = i / n;
+      size_t x = i % n;
+
+      // Encode (x,y) -> Morton
+      size_t morton_idx = microvtk::detail::morton_encode_2d(
+          static_cast<uint32_t>(x), static_cast<uint32_t>(y));
+
+      sum += v[morton_idx];
+    }
+    benchmark::DoNotOptimize(sum);
+  }
+  state.SetBytesProcessed(static_cast<int64_t>(state.iterations()) *
+                          static_cast<int64_t>(size) * sizeof(double));
+}
+BENCHMARK(BM_Indexing_Manual_2D)->Range(4096, 262144);  // 64^2 to 512^2 approx
+
+static void BM_Indexing_Adapter_2D(benchmark::State& state) {
+  size_t n = static_cast<size_t>(std::sqrt(state.range(0)));
+  size_t size = n * n;
+  std::array<size_t, 2> dims = {n, n};
+
+  std::vector<double> v(size);
+  std::iota(v.begin(), v.end(), 0.0);
+
+  auto view = v | microvtk::views::reorder_z_curve(dims);
+
+  for (auto _ : state) {
+    double sum = 0.0;
+    for (auto val : view) {
+      sum += val;
+    }
+    benchmark::DoNotOptimize(sum);
+  }
+  state.SetBytesProcessed(static_cast<int64_t>(state.iterations()) *
+                          static_cast<int64_t>(size) * sizeof(double));
+}
+BENCHMARK(BM_Indexing_Adapter_2D)->Range(4096, 262144);
 
 // ----------------------------------------------------------------------------
 // Kokkos Benchmarks

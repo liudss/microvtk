@@ -207,6 +207,7 @@ if(MICROVTK_BUILD_TESTS)
             tests/test_coverage_gap.cpp
             tests/test_compression.cpp
             tests/test_adapter_kokkos_cabana.cpp
+            tests/test_indexing_adapter.cpp
         )
         microvtk_set_strict_warnings(unit_tests)
         target_link_libraries(unit_tests PRIVATE microvtk GTest::gtest GTest::gtest_main)
@@ -250,6 +251,10 @@ if(MICROVTK_BUILD_EXAMPLES)
     target_link_libraries(example_vti_adapt PRIVATE microvtk)
     microvtk_set_strict_warnings(example_vti_adapt)
 
+    add_executable(example_indexing examples/indexing.cpp)
+    target_link_libraries(example_indexing PRIVATE microvtk)
+    microvtk_set_strict_warnings(example_indexing)
+
     if(MICROVTK_USE_KOKKOS)
         add_executable(example_hpc examples/hpc_adapters.cpp)
         target_link_libraries(example_hpc PRIVATE microvtk)
@@ -282,6 +287,11 @@ if(MICROVTK_BUILD_BENCHMARKS)
         add_executable(bench_adapters benchmarks/bench_adapters.cpp)
         target_link_libraries(bench_adapters PRIVATE microvtk benchmark::benchmark)
         microvtk_set_strict_warnings(bench_adapters)
+
+        # Enable architecture-specific optimizations (BMI2) for benchmarks
+        if(NOT MSVC)
+            target_compile_options(bench_adapters PRIVATE -march=native)
+        endif()
     endif()
 endif()
 

@@ -4,27 +4,41 @@
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 [![CI](https://github.com/liudss/microvtk/actions/workflows/ci.yml/badge.svg)](https://github.com/liudss/microvtk/actions/workflows/ci.yml)
 
-**MicroVTK** is a lightweight, header-only C++20 library designed for high-performance scientific data visualization. It specializes in writing **VTK XML** files (`.vtu`, `.pvd`) with a focus on efficiency, memory safety, and seamless integration with modern HPC ecosystems.
+MicroVTK is a lightweight, header-only C++20 library designed for high-performance scientific data visualization. It specializes in writing VTK XML files (.vtu, .vti, .pvd) with a focus on efficiency, memory safety, and seamless integration with modern HPC ecosystems.
 
-> **Key Philosophy:** "Your data stays where it is. We just stream it to disk."
+**Key Philosophy:** "Your data stays where it is. We just stream it to disk."
 
 ## Key Features
 
-| Feature | Description |
-| :--- | :--- |
-| **Zero-Copy Streaming** | Data is streamed directly from user memory to disk. No intermediate buffers, no redundant copies. |
-| **VTU & VTI Support** | Supports both **Unstructured Grids** (`.vtu`) and **Structured Image Data** (`.vti`). |
-| **Modern C++20** | Built with Concepts, Ranges, Spans, and `std::format` for a type-safe and expressive API. |
-| **HPC Ready** | Native adapters for **Kokkos Views** (arbitrary Rank/Layout) and **Cabana Slices** (SoA/AoS/Tensor). |
-| **Compression** | Transparent support for **ZLIB** and **LZ4** compression to reduce I/O bottlenecks. |
-| **Zero Dependencies** | The core library depends *only* on the C++ Standard Library. Optional features use standard submodules. |
-| **Memory Safe** | Rigorously tested with **Valgrind** in CI to ensure no leaks or dangling references. |
+*   **Zero-Copy Streaming**
+    Data is streamed directly from user memory to disk. No intermediate buffers, no redundant copies.
+
+*   **VTU & VTI Support**
+    Supports both Unstructured Grids (.vtu) and Structured Image Data (.vti).
+
+*   **Modern C++20**
+    Built with Concepts, Ranges, Spans, and std::format for a type-safe and expressive API.
+
+*   **HPC Ready**
+    Native adapters for Kokkos Views (arbitrary Rank/Layout) and Cabana Slices (SoA/AoS/Tensor).
+
+*   **Custom Indexing**
+    Support for Morton Codes (Z-Order) curves in 2D and 3D with hardware acceleration (BMI2).
+
+*   **Compression**
+    Transparent support for ZLIB and LZ4 compression to reduce I/O bottlenecks.
+
+*   **Zero Dependencies**
+    The core library depends only on the C++ Standard Library. Optional features use standard submodules.
+
+*   **Memory Safe**
+    Rigorously tested with Valgrind in CI to ensure no leaks or dangling references.
 
 ---
 
 ## Integration
 
-MicroVTK is designed as a **header-only** library. The recommended way to use it is via CMake `add_subdirectory`.
+MicroVTK is designed as a header-only library. The recommended way to use it is via CMake `add_subdirectory`.
 
 ### 1. Add as Submodule
 ```bash
@@ -100,27 +114,15 @@ int main() {
 }
 ```
 
-### 3. High-Performance Computing (Kokkos)
+### 3. High-Performance Computing (Kokkos & Cabana)
 Handle complex, multi-dimensional array layouts automatically. MicroVTK maps logical indices to VTK's expected order without data replication.
 
 ```cpp
-// 1. Contiguous Data (Fast Path)
-// Direct memory mapping for standard LayoutRight (C-style) views
+// Kokkos: Contiguous Data (Fast Path)
 Kokkos::View<double*[3], Kokkos::LayoutRight, Kokkos::HostSpace> coords("coords", N);
 writer.setPoints(microvtk::adapt(coords));
 
-// 2. Strided / Non-Contiguous Data (Rank-3 Tensor Field)
-// Supports LayoutLeft (Fortran-style) and arbitrary Rank
-Kokkos::View<double*[3][3], Kokkos::LayoutLeft, Kokkos::HostSpace> stress("stress", N);
-
-// Automatically maps (N, 3, 3) -> (N, 9) flat components
-writer.addPointData("StressTensor", microvtk::adapt(stress), 9);
-```
-
-### 3. Particle Systems (Cabana)
-Seamlessly slice and flatten Array-of-Structs-of-Arrays (AoSoA) structures.
-
-```cpp
+// Cabana: Particle Systems
 using DataTypes = Cabana::MemberTypes<double[3], double[3][3]>;
 Cabana::AoSoA<DataTypes, Kokkos::HostSpace> particles("particles", N);
 
@@ -132,7 +134,25 @@ writer.addPointData("Velocity", microvtk::adapt(velocity_slice), 3);
 writer.addPointData("Stress", microvtk::adapt(stress_slice), 9);
 ```
 
-### 4. Time Series (.pvd)
+### 4. Custom Indexing (Morton / Z-Curve)
+Handle data stored in Morton order (for cache locality) by automatically reordering it to VTK's Raster order on-the-fly.
+
+```cpp
+#include <microvtk/indexing_adapter.hpp>
+
+// Data stored in Z-order curve (3D)
+std::vector<double> morton_data = ...;
+std::array<size_t, 3> dims = {128, 128, 128};
+
+// 1. Create a reordered view (Zero-Copy)
+// Automatically detects 2D/3D based on dims size
+auto view = morton_data | microvtk::views::reorder_z_curve(dims);
+
+// 2. Write (Disk file is standard Raster order)
+writer.addPointData("Temperature", view);
+```
+
+### 5. Time Series (.pvd)
 Manage transient simulations with the PVD writer.
 
 ```cpp
@@ -181,7 +201,7 @@ The project includes comprehensive unit tests (GoogleTest) and integration tests
 ```
 
 **Integration Tests (with Memory Safety):**
-MicroVTK supports running integration tests under **Valgrind** to guarantee memory safety.
+MicroVTK supports running integration tests under Valgrind to guarantee memory safety.
 
 ```bash
 # Install uv for Python dependency management
@@ -205,12 +225,12 @@ microvtk/
 │   ├── vtu_writer.hpp      # UnstructuredGrid Writer
 │   ├── vti_writer.hpp      # ImageData (Structured Grid) Writer
 │   ├── pvd_writer.hpp      # Time Series Writer
-│   └── *_adapter.hpp       # Data Adapters (std, Kokkos, Cabana)
-├── examples/               # Example usages (Basic, HPC, Compression)
+│   └── *_adapter.hpp       # Data Adapters (std, Kokkos, Cabana, Indexing)
+├── examples/               # Example usages (Basic, HPC, Compression, Indexing)
 ├── tests/                  # Unit and Integration tests
 └── external/               # Third-party dependencies (Submodules)
 ```
 
 ## License
 
-This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License - see the LICENSE file for details.

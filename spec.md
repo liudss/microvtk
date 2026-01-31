@@ -32,6 +32,7 @@ microvtk/
 │   ├── adapter.hpp          # Generic range and AoS adapters
 │   ├── cabana_adapter.hpp   # Adapter for Cabana slices
 │   ├── kokkos_adapter.hpp   # Adapter for Kokkos Views
+│   ├── indexing_adapter.hpp # Custom Indexing (Morton/Z-Curve)
 │   ├── vtu_writer.hpp       # Main UnstructuredGrid writer
 │   ├── vti_writer.hpp       # ImageData (Structured Grid) writer
 │   ├── pvd_writer.hpp       # Time-series manager
@@ -54,6 +55,8 @@ A high-performance XML generator that uses `std::format` and RAII-based `ScopedE
 - **HPC Adapters**: Specialized support for `Kokkos::View` and `Cabana::Slice`.
     - **Kokkos**: Supports `LayoutRight`, `LayoutLeft`, and `LayoutStride`. Contiguous layouts use a fast `std::span` path, while non-contiguous layouts use a C++20 `std::views::transform` path to ensure logical Row-Major indexing order for **arbitrary Ranks**.
     - **Cabana**: Automatically flattens slices, including support for **multidimensional array (tensor)** member types by mapping flat component indices to nested array indices.
+- **Indexing Adapters**: Support for non-linear memory layouts.
+    - **Morton (Z-Curve)**: Zero-copy view that maps linear Raster-order requests to Morton-order storage. Supports 2D and 3D with automatic **BMI2 hardware acceleration** (`PDEP` instruction) for performance parity with raw iteration.
 
 ## 5. Data Formats & Modes
 
