@@ -4,66 +4,58 @@
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 [![CI](https://github.com/liudss/microvtk/actions/workflows/ci.yml/badge.svg)](https://github.com/liudss/microvtk/actions/workflows/ci.yml)
 
-MicroVTK is a lightweight, header-only C++20 library designed for high-performance scientific data visualization. It specializes in writing VTK XML files (.vtu, .vti, .pvd) with a focus on efficiency, memory safety, and seamless integration with modern HPC ecosystems.
+MicroVTK is a header-only C++20 library developed for high-performance computing (HPC) and scientific visualization applications. It facilitates the efficient generation of VTK XML artifacts (`.vtu`, `.vti`, `.pvd`) through a strictly zero-copy streaming architecture. The library adheres to modern C++ standards to ensure type safety, minimal memory footprint, and seamless interoperability with contemporary simulation frameworks.
 
-**Key Philosophy:** "Your data stays where it is. We just stream it to disk."
+## Core Capabilities
 
-## Key Features
+*   **Zero-Copy Architecture**
+    Implements a streaming I/O model that serializes data directly from application memory to disk, eliminating redundant data replication and intermediate buffering.
 
-*   **Zero-Copy Streaming**
-    Data is streamed directly from user memory to disk. No intermediate buffers, no redundant copies.
+*   **Format Support**
+    Provides comprehensive support for Unstructured Grids (`.vtu`) for finite element/volume methods and Structured Image Data (`.vti`) for regular grids.
 
-*   **VTU & VTI Support**
-    Supports both Unstructured Grids (.vtu) and Structured Image Data (.vti).
+*   **HPC Interoperability**
+    Includes specialized adapters for the Kokkos performance portability ecosystem and Cabana particle toolkit. It automatically handles arbitrary memory layouts (e.g., LayoutLeft, LayoutStride) and complex data structures (AoSoA).
 
-*   **Modern C++20**
-    Built with Concepts, Ranges, Spans, and std::format for a type-safe and expressive API.
-
-*   **HPC Ready**
-    Native adapters for Kokkos Views (arbitrary Rank/Layout) and Cabana Slices (SoA/AoS/Tensor).
-
-*   **Custom Indexing**
-    Support for Morton Codes (Z-Order) curves in 2D and 3D with hardware acceleration (BMI2).
+*   **Advanced Indexing**
+    Supports non-linear memory layouts, specifically Morton Codes (Z-Order curves) in two and three dimensions. It utilizes BMI2 hardware instructions (`PDEP`) for accelerated coordinate encoding when available.
 
 *   **Compression**
-    Transparent support for ZLIB and LZ4 compression to reduce I/O bottlenecks.
+    Integrates transparent support for ZLIB and LZ4 compression algorithms to mitigate I/O bandwidth limitations.
 
-*   **Zero Dependencies**
-    The core library depends only on the C++ Standard Library. Optional features use standard submodules.
-
-*   **Memory Safe**
-    Rigorously tested with Valgrind in CI to ensure no leaks or dangling references.
+*   **Reliability & Standards**
+    The core library maintains zero external dependencies. The codebase is rigorously validated via GoogleTest and verified for memory safety using Valgrind.
 
 ---
 
 ## Integration
 
-MicroVTK is designed as a header-only library. The recommended way to use it is via CMake `add_subdirectory`.
+MicroVTK is distributed as a header-only library. Integration via CMake `add_subdirectory` is recommended.
 
-### 1. Add as Submodule
+### 1. Submodule Configuration
 ```bash
 git submodule add https://github.com/liudss/microvtk.git external/microvtk
 ```
 
-### 2. Configure CMake
+### 2. CMake Integration
 ```cmake
-# Optional: Enable HPC features
+# Optional: Enable HPC extensions
 set(MICROVTK_USE_KOKKOS ON)
 set(MICROVTK_USE_CABANA ON)
 set(MICROVTK_USE_LZ4 ON)
 
 add_subdirectory(external/microvtk)
 
-add_executable(my_simulation main.cpp)
-target_link_libraries(my_simulation PRIVATE microvtk::microvtk)
+add_executable(simulation_solver main.cpp)
+target_link_libraries(simulation_solver PRIVATE microvtk::microvtk)
 ```
 
 ---
 
 ## Usage Examples
 
-### 1. Basic Unstructured Grid (.vtu)
-Stream standard C++ vectors directly to a VTU file.
+### 1. Unstructured Grid Generation (.vtu)
+Serialization of standard STL containers into an unstructured grid format.
 
 ```cpp
 #include <microvtk/microvtk.hpp>
@@ -72,17 +64,17 @@ Stream standard C++ vectors directly to a VTU file.
 int main() {
     microvtk::VtuWriter writer;
 
-    // 1. Geometry (N points, 3 components)
+    // 1. Geometry Definition (N points, 3 components)
     std::vector<double> points = {0,0,0, 1,0,0, 0,1,0, 0,0,1};
     writer.setPoints(points);
 
-    // 2. Topology (Single Tetrahedron)
+    // 2. Topology Definition (Single Tetrahedron)
     std::vector<int32_t> conn = {0, 1, 2, 3};
     std::vector<int32_t> offsets = {4};
     std::vector<uint8_t> types = {static_cast<uint8_t>(microvtk::CellType::Tetra)};
     writer.setCells(conn, offsets, types);
 
-    // 3. Data Attributes
+    // 3. Attribute Association
     std::vector<double> pressure = {101.3, 102.0, 101.5, 100.8};
     writer.addPointData("Pressure", pressure);
 
@@ -90,8 +82,8 @@ int main() {
 }
 ```
 
-### 2. Structured Image Data (.vti)
-Define a uniform grid (image) using extent, origin, and spacing. Use the `adapt()` utility to write from an Array-of-Structs (AoS).
+### 2. Structured Grid with AoS Adaptation (.vti)
+Direct serialization from an Array-of-Structs (AoS) memory layout using the `adapt` utility.
 
 ```cpp
 #include <microvtk/microvtk.hpp>
@@ -100,13 +92,13 @@ Define a uniform grid (image) using extent, origin, and spacing. Use the `adapt(
 struct Pixel { double value; int id; };
 
 int main() {
-    // 10x10x1 grid
+    // 10x10x1 uniform grid
     std::array<int, 6> extent = {0, 9, 0, 9, 0, 0};
     microvtk::VtiWriter writer(extent);
 
     std::vector<Pixel> data = ...; // 100 pixels
 
-    // Use adapt() to extract members from AoS without copying
+    // Extract members directly from AoS without data copy
     writer.addPointData("Intensity", microvtk::adapt(data, &Pixel::value));
     writer.addPointData("ID", microvtk::adapt(data, &Pixel::id));
 
@@ -114,46 +106,46 @@ int main() {
 }
 ```
 
-### 3. High-Performance Computing (Kokkos & Cabana)
-Handle complex, multi-dimensional array layouts automatically. MicroVTK maps logical indices to VTK's expected order without data replication.
+### 3. HPC Integration (Kokkos & Cabana)
+Automatic mapping of logical indices to VTK-compatible ordering for complex memory layouts.
 
 ```cpp
-// Kokkos: Contiguous Data (Fast Path)
+// Kokkos: Contiguous Memory Mapping (Fast Path)
 Kokkos::View<double*[3], Kokkos::LayoutRight, Kokkos::HostSpace> coords("coords", N);
 writer.setPoints(microvtk::adapt(coords));
 
-// Cabana: Particle Systems
+// Cabana: Particle Data Management
 using DataTypes = Cabana::MemberTypes<double[3], double[3][3]>;
 Cabana::AoSoA<DataTypes, Kokkos::HostSpace> particles("particles", N);
 
 auto velocity_slice = Cabana::slice<0>(particles);
 auto stress_slice = Cabana::slice<1>(particles);
 
-// Write velocity (3 components) and stress tensor (9 components)
+// Serialize vector (3 components) and tensor (9 components) fields
 writer.addPointData("Velocity", microvtk::adapt(velocity_slice), 3);
 writer.addPointData("Stress", microvtk::adapt(stress_slice), 9);
 ```
 
-### 4. Custom Indexing (Morton / Z-Curve)
-Handle data stored in Morton order (for cache locality) by automatically reordering it to VTK's Raster order on-the-fly.
+### 4. Morton (Z-Order) Curve Support
+On-the-fly reordering of spatially sorted data (Morton code) to standard Raster order.
 
 ```cpp
 #include <microvtk/indexing_adapter.hpp>
 
-// Data stored in Z-order curve (3D)
+// Data stored in Z-order curve layout
 std::vector<double> morton_data = ...;
 std::array<size_t, 3> dims = {128, 128, 128};
 
-// 1. Create a reordered view (Zero-Copy)
-// Automatically detects 2D/3D based on dims size
+// 1. Initialize Reordering View (Zero-Copy)
+// Automatically infers 2D/3D dimensionality and enables BMI2 acceleration if available
 auto view = morton_data | microvtk::views::reorder_z_curve(dims);
 
-// 2. Write (Disk file is standard Raster order)
+// 2. Serialize
 writer.addPointData("Temperature", view);
 ```
 
-### 5. Time Series (.pvd)
-Manage transient simulations with the PVD writer.
+### 5. Transient Data Management (.pvd)
+Management of time-series data collections.
 
 ```cpp
 microvtk::PvdWriter pvd("simulation.pvd");
@@ -161,24 +153,23 @@ microvtk::PvdWriter pvd("simulation.pvd");
 for (int step = 0; step < 100; ++step) {
     std::string filename = std::format("step_{:04d}.vtu", step);
 
-    // ... write vtu file ...
+    // ... Generate frame ...
 
-    // Register file and timestamp
+    // Register artifact with timestamp
     pvd.addStep(step * 0.01, filename);
-    pvd.save(); // Explicit save updates the file on disk immediately
+    pvd.save(); // Synchronize file state
 }
 ```
 
 ---
 
-## Building & Testing
+## Build & Verification
 
-### Requirements
-*   **Compiler**: GCC 13+, Clang 16+, MSVC 19.34+ (C++20 compliant)
-*   **CMake**: 3.25+
-*   **Ninja**: Recommended build system
+### System Requirements
+*   **Compiler**: GCC 13+, Clang 16+, or MSVC 19.34+ (C++20 compliant)
+*   **Build System**: CMake 3.25+ (Ninja generator recommended)
 
-### Build Instructions
+### Compilation
 ```bash
 git clone --recursive https://github.com/liudss/microvtk.git
 cd microvtk
@@ -192,45 +183,44 @@ cmake -S . -B build -G Ninja \
 cmake --build build
 ```
 
-### Running Tests
-The project includes comprehensive unit tests (GoogleTest) and integration tests (Python + VTK).
+### Testing
+The project implements a two-tier testing strategy: C++ Unit Tests (GoogleTest) and Python Integration Tests (PyTest + VTK).
 
 **Unit Tests:**
 ```bash
 ./build/unit_tests
 ```
 
-**Integration Tests (with Memory Safety):**
-MicroVTK supports running integration tests under Valgrind to guarantee memory safety.
+**Integration Tests (with Memory Sanitization):**
+Integration tests can be executed under Valgrind supervision to ensure memory safety.
 
 ```bash
-# Install uv for Python dependency management
+# Initialize dependency manager
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# Run integration tests
-# Set environment variable to enable strict Valgrind checking
+# Execute tests with strict memory checking
 export MICROVTK_USE_VALGRIND=ON
 uv run pytest tests/integration
 ```
 
 ---
 
-## Project Structure
+## Project Organization
 
 ```text
 microvtk/
-├── include/microvtk/       # Header-only library source
+├── include/microvtk/       # Core library headers
 │   ├── common/             # Concepts, Types, Enums
 │   ├── core/               # Streaming logic, Compression, XML Builders
 │   ├── vtu_writer.hpp      # UnstructuredGrid Writer
-│   ├── vti_writer.hpp      # ImageData (Structured Grid) Writer
+│   ├── vti_writer.hpp      # ImageData Writer
 │   ├── pvd_writer.hpp      # Time Series Writer
-│   └── *_adapter.hpp       # Data Adapters (std, Kokkos, Cabana, Indexing)
-├── examples/               # Example usages (Basic, HPC, Compression, Indexing)
-├── tests/                  # Unit and Integration tests
-└── external/               # Third-party dependencies (Submodules)
+│   └── *_adapter.hpp       # Data Adapters (Standard, HPC, Indexing)
+├── examples/               # Implementation examples
+├── tests/                  # Verification suite
+└── external/               # Third-party dependencies
 ```
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is licensed under the MIT License. Please refer to the [LICENSE](LICENSE) file for full terms and conditions.
