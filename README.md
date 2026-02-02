@@ -10,6 +10,7 @@ MicroVTK is a header-only C++20 library developed for high-performance computing
 
 *   **Zero-Copy Architecture**
     Implements a streaming I/O model that serializes data directly from application memory to disk, eliminating redundant data replication and intermediate buffering.
+    > **⚠️ Lifetime Note:** The writer stores *views* to the provided data. The application must ensure the underlying data containers remain valid until the `.write()` method is called.
 
 *   **Format Support**
     Provides comprehensive support for Unstructured Grids (`.vtu`) for finite element/volume methods and Structured Image Data (`.vti`) for regular grids.
