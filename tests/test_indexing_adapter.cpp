@@ -48,6 +48,42 @@ TEST(IndexingAdapter, MortonEncodingCorrectness) {
   }
 }
 
+TEST(IndexingAdapter, ExplicitGenericImplementation) {
+  // Explicitly test the generic implementation even if BMI2 is active.
+  // This ensures the fallback logic remains correct.
+
+  // Replicate 3D combine logic for test
+  auto encode_generic = [](uint32_t x, uint32_t y, uint32_t z) {
+    return microvtk::detail::split_by_3_generic(x) |
+           (microvtk::detail::split_by_3_generic(y) << 1) |
+           (microvtk::detail::split_by_3_generic(z) << 2);
+  };
+
+  EXPECT_EQ(encode_generic(1, 1, 1), 7);
+  EXPECT_EQ(encode_generic(2, 0, 0), 8);  // x=10 -> 100(8)
+
+  // Random check
+  EXPECT_EQ(encode_generic(3, 2, 1), simple_morton(3, 2, 1));
+}
+
+#if defined(__BMI2__)
+TEST(IndexingAdapter, ExplicitBMI2Implementation) {
+  // Explicitly test the hardware accelerated implementation.
+  // This runs only if the test is compiled with BMI2 support (e.g.
+  // -march=native)
+
+  auto encode_bmi2 = [](uint32_t x, uint32_t y, uint32_t z) {
+    return microvtk::detail::split_by_3_bmi2(x) |
+           (microvtk::detail::split_by_3_bmi2(y) << 1) |
+           (microvtk::detail::split_by_3_bmi2(z) << 2);
+  };
+
+  EXPECT_EQ(encode_bmi2(1, 1, 1), 7);
+  EXPECT_EQ(encode_bmi2(2, 0, 0), 8);
+  EXPECT_EQ(encode_bmi2(3, 2, 1), simple_morton(3, 2, 1));
+}
+#endif
+
 TEST(IndexingAdapter, ViewReorderingMismatch) {
   // Case: 4x1x1 grid.
   // Raster: 0, 1, 2, 3
