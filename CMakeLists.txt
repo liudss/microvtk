@@ -288,6 +288,10 @@ if(MICROVTK_BUILD_BENCHMARKS)
         target_link_libraries(bench_adapters PRIVATE microvtk benchmark::benchmark)
         microvtk_set_strict_warnings(bench_adapters)
 
+        add_executable(bench_vti benchmarks/bench_vti.cpp)
+        target_link_libraries(bench_vti PRIVATE microvtk benchmark::benchmark)
+        microvtk_set_strict_warnings(bench_vti)
+
         # Enable architecture-specific optimizations (BMI2) for benchmarks
         if(NOT MSVC)
             target_compile_options(bench_adapters PRIVATE -march=native)
