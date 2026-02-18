@@ -164,7 +164,7 @@ endif()
 
 if(MICROVTK_USE_CABANA)
     target_compile_definitions(microvtk INTERFACE MICROVTK_HAS_CABANA)
-    target_link_libraries(microvtk INTERFACE Cabana::Core)
+    target_link_libraries(microvtk INTERFACE Cabana::cabanacore)
 endif()
 
 
