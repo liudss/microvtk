@@ -90,6 +90,7 @@ private:
     uint64_t offset;
     std::string typeName;
     int numComponents;
+    size_t accessorIndex;
     bool valid = false;
   };
 
@@ -98,10 +99,10 @@ private:
                           std::vector<uint64_t>& originalSizes) {
     uint64_t runningOffset = 0;
 
-    auto processBlock = [&](DataBlockInfo& info, size_t index) {
+    auto processBlock = [&](DataBlockInfo& info) {
       if (!info.valid) return;
 
-      auto& accessor = accessors_[index];
+      auto& accessor = accessors_[info.accessorIndex];
       std::vector<uint8_t> tempRaw;
       accessor->write_to(tempRaw);
 
@@ -114,14 +115,13 @@ private:
       runningOffset += headerSize + compressedBuffers.back().size();
     };
 
-    processBlock(pointsBlock_, 0);
-    processBlock(cellsConnBlock_, 1);
-    processBlock(cellsOffsetsBlock_, 2);
-    processBlock(cellsTypesBlock_, 3);
+    processBlock(pointsBlock_);
+    processBlock(cellsConnBlock_);
+    processBlock(cellsOffsetsBlock_);
+    processBlock(cellsTypesBlock_);
 
-    size_t idx = 4;
-    for (auto& block : pointDataBlocks_) processBlock(block, idx++);
-    for (auto& block : cellDataBlocks_) processBlock(block, idx++);
+    for (auto& block : pointDataBlocks_) processBlock(block);
+    for (auto& block : cellDataBlocks_) processBlock(block);
   }
 
   void writeXmlStructure(std::ostream& ofs, bool usingCompression) {
@@ -235,6 +235,7 @@ private:
     info.offset = currentOffset_;
     info.typeName = vtkTypeName<std::remove_const_t<T>>();
     info.numComponents = numComponents;
+    info.accessorIndex = accessors_.size();
     info.valid = true;
 
     auto accessor =
