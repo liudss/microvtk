@@ -33,7 +33,7 @@ public:
 
   // Adds an attribute: key="value"
   void attribute(std::string_view name, std::string_view value) {
-    os_ << std::format(" {}=\"{}\"", name, value);
+    os_ << std::format(" {}=\"{}\"", name, escapeXml(value));
   }
 
   // Adds an attribute with numeric value
@@ -46,7 +46,7 @@ public:
   void endElement() {
     if (element_stack_.empty()) return;
 
-    std::string name = element_stack_.back();
+    std::string name = std::move(element_stack_.back());
     element_stack_.pop_back();
     depth_--;
 
@@ -87,6 +87,33 @@ public:
   ScopedElement scopedElement(std::string_view name) { return {*this, name}; }
 
 private:
+  static std::string escapeXml(std::string_view str) {
+    std::string escaped;
+    escaped.reserve(str.size());
+    for (char c : str) {
+      switch (c) {
+        case '&':
+          escaped += "&amp;";
+          break;
+        case '<':
+          escaped += "&lt;";
+          break;
+        case '>':
+          escaped += "&gt;";
+          break;
+        case '\"':
+          escaped += "&quot;";
+          break;
+        case '\'':
+          escaped += "&apos;";
+          break;
+        default:
+          escaped += c;
+      }
+    }
+    return escaped;
+  }
+
   void indent() {
     for (int i = 0; i < depth_ * indent_spaces_; ++i) {
       os_ << " ";

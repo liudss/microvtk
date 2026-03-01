@@ -101,21 +101,26 @@ auto reorder_z_curve_impl(R&& range, std::array<size_t, 3> dims) {
   size_t total_size = nx * ny * nz;
 
   return std::views::iota(size_t{0}, total_size) |
-         std::views::transform([range = std::views::all(std::forward<R>(range)),
-                                nx, ny](size_t linear_idx) -> decltype(auto) {
-           // Decode Raster Order (x fast, y medium, z slow)
-           size_t z = linear_idx / (nx * ny);
-           size_t rem = linear_idx % (nx * ny);
-           size_t y = rem / nx;
-           size_t x = rem % nx;
+         std::views::transform(
+             [range = std::views::all(std::forward<R>(range)), nx,
+              ny](size_t linear_idx) -> std::ranges::range_value_t<R> {
+               // Decode Raster Order (x fast, y medium, z slow)
+               size_t z = linear_idx / (nx * ny);
+               size_t rem = linear_idx % (nx * ny);
+               size_t y = rem / nx;
+               size_t x = rem % nx;
 
-           // Encode Morton Order
-           size_t morton_idx = microvtk::detail::morton_encode_3d(
-               static_cast<uint32_t>(x), static_cast<uint32_t>(y),
-               static_cast<uint32_t>(z));
+               // Encode Morton Order
+               size_t morton_idx = microvtk::detail::morton_encode_3d(
+                   static_cast<uint32_t>(x), static_cast<uint32_t>(y),
+                   static_cast<uint32_t>(z));
 
-           return range[morton_idx];
-         });
+               if (morton_idx >= std::ranges::size(range)) {
+                 return std::ranges::range_value_t<R>{};
+               }
+
+               return range[morton_idx];
+             });
 }
 
 // Implementation of the view logic (2D)
@@ -126,18 +131,23 @@ auto reorder_z_curve_impl(R&& range, std::array<size_t, 2> dims) {
   size_t total_size = nx * ny;
 
   return std::views::iota(size_t{0}, total_size) |
-         std::views::transform([range = std::views::all(std::forward<R>(range)),
-                                nx](size_t linear_idx) -> decltype(auto) {
-           // Decode Raster Order (x fast, y slow)
-           size_t y = linear_idx / nx;
-           size_t x = linear_idx % nx;
+         std::views::transform(
+             [range = std::views::all(std::forward<R>(range)),
+              nx](size_t linear_idx) -> std::ranges::range_value_t<R> {
+               // Decode Raster Order (x fast, y slow)
+               size_t y = linear_idx / nx;
+               size_t x = linear_idx % nx;
 
-           // Encode Morton Order
-           size_t morton_idx = microvtk::detail::morton_encode_2d(
-               static_cast<uint32_t>(x), static_cast<uint32_t>(y));
+               // Encode Morton Order
+               size_t morton_idx = microvtk::detail::morton_encode_2d(
+                   static_cast<uint32_t>(x), static_cast<uint32_t>(y));
 
-           return range[morton_idx];
-         });
+               if (morton_idx >= std::ranges::size(range)) {
+                 return std::ranges::range_value_t<R>{};
+               }
+
+               return range[morton_idx];
+             });
 }
 
 // Adaptor closure for pipe support

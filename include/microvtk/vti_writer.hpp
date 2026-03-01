@@ -56,6 +56,8 @@ public:
 
     if (usingCompression) {
       prepareCompression(compressor, compressedBuffers, originalSizes);
+    } else {
+      recomputeRawOffsets();
     }
 
     std::ofstream ofs(std::string(filename), std::ios::binary);
@@ -73,6 +75,19 @@ private:
     int numComponents;
     bool valid = false;
   };
+
+  void recomputeRawOffsets() {
+    uint64_t runningOffset = 0;
+    size_t idx = 0;
+    auto process = [&](DataBlockInfo& info) {
+      if (!info.valid) return;
+      info.offset = runningOffset;
+      runningOffset += sizeof(uint64_t) + accessors_[idx++]->size_bytes();
+    };
+
+    for (auto& b : pointDataBlocks_) process(b);
+    for (auto& b : cellDataBlocks_) process(b);
+  }
 
   void prepareCompression(const std::unique_ptr<core::Compressor>& compressor,
                           std::vector<std::vector<uint8_t>>& compressedBuffers,

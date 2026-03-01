@@ -6,11 +6,15 @@
 #include <vector>
 
 #ifdef MICROVTK_HAS_ZLIB
+#include <limits>
+#include <stdexcept>
 #include <zlib.h>
 #endif
 
 #ifdef MICROVTK_HAS_LZ4
+#include <limits>
 #include <lz4.h>
+#include <stdexcept>
 #endif
 
 namespace microvtk::core {
@@ -33,6 +37,10 @@ public:
 class ZlibCompressor : public Compressor {
 public:
   std::vector<uint8_t> compress(std::span<const uint8_t> input) override {
+    if (input.size() > std::numeric_limits<uLong>::max()) {
+      throw std::runtime_error("ZlibCompressor: Input size too large.");
+    }
+
     uLongf destLen = compressBound(static_cast<uLong>(input.size()));
     std::vector<uint8_t> output(destLen);
 
@@ -53,6 +61,10 @@ public:
 class Lz4Compressor : public Compressor {
 public:
   std::vector<uint8_t> compress(std::span<const uint8_t> input) override {
+    if (input.size() > static_cast<size_t>(std::numeric_limits<int>::max())) {
+      throw std::runtime_error("Lz4Compressor: Input size too large.");
+    }
+
     int maxDstSize = LZ4_compressBound(static_cast<int>(input.size()));
     std::vector<uint8_t> output(maxDstSize);
 
