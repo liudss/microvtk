@@ -24,16 +24,20 @@ TEST(VtuWriter, DataSizeMismatch) {
 
   // Add data for 3 points (Mismatch!)
   std::vector<double> data3 = {1, 2, 3};
-  EXPECT_THROW(writer.addPointData("bad", data3), std::invalid_argument);
+  writer.addPointData("bad", data3);
+  EXPECT_THROW(writer.write("should_fail.vtu"), std::invalid_argument);
+
+  VtuWriter writer2;
+  writer2.setPoints(points);
 
   // 1 cell
   std::vector<int32_t> conn = {0, 1};
   std::vector<int32_t> offsets = {2};
   std::vector<uint8_t> types = {3};  // Polyline
-  writer.setCells(conn, offsets, types);
+  writer2.setCells(conn, offsets, types);
 
   // Add cell data for 2 cells (Mismatch!)
   std::vector<double> cell_data2 = {1, 2};
-  EXPECT_THROW(writer.addCellData("bad_cell", cell_data2),
-               std::invalid_argument);
+  writer2.addCellData("bad_cell", cell_data2);
+  EXPECT_THROW(writer2.write("should_fail_cell.vtu"), std::invalid_argument);
 }

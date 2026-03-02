@@ -63,6 +63,22 @@ public:
 
   // 5. Write to file
   void write(std::string_view filename) {
+    // Late validation of data sizes (snapshot check)
+    for (const auto& block : pointDataBlocks_) {
+      if (block.numberOfElements != numberOfPoints_ * block.numComponents) {
+        throw std::invalid_argument(
+            "VtuWriter::write: Size mismatch in PointData '" + block.name +
+            "'.");
+      }
+    }
+    for (const auto& block : cellDataBlocks_) {
+      if (block.numberOfElements != numberOfCells_ * block.numComponents) {
+        throw std::invalid_argument(
+            "VtuWriter::write: Size mismatch in CellData '" + block.name +
+            "'.");
+      }
+    }
+
     bool usingCompression = (compressionType_ != core::CompressionType::None);
     auto compressor = core::createCompressor(compressionType_);
 
@@ -93,6 +109,7 @@ private:
     std::string typeName;
     int numComponents;
     size_t accessorIndex;
+    size_t numberOfElements = 0;
     bool valid = false;
   };
 
@@ -255,6 +272,7 @@ private:
     info.typeName = vtkTypeName<std::remove_const_t<T>>();
     info.numComponents = numComponents;
     info.accessorIndex = accessors_.size();
+    info.numberOfElements = std::ranges::size(view);
     info.valid = true;
 
     auto accessor =
