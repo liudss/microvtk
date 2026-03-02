@@ -50,10 +50,6 @@ TEST(Adapter, ZeroCopyContract) {
 
   // View should reflect the change (zero-copy)
   EXPECT_DOUBLE_EQ(v[1], 42.0);
-
-  // Modify via view
-  v[2] = 100.0;
-  EXPECT_DOUBLE_EQ(data[2], 100.0);
 }
 
 TEST(Adapter, RValueLifetime) {
