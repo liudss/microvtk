@@ -137,11 +137,53 @@ TEST(KokkosAdapterTest, AdaptViewRank3LayoutLeft) {
     }
   }
 }
+
+TEST(KokkosAdapterTest, AdaptRank0View) {
+  Kokkos::View<double, Kokkos::HostSpace> v("scalar");
+  v() = 42.0;
+  auto span = microvtk::adapt(v);
+  EXPECT_EQ(span.size(), 1);
+  EXPECT_DOUBLE_EQ(span[0], 42.0);
+}
+
+TEST(KokkosAdapterTest, LayoutStrideCorrectness) {
+  // 5x3, LayoutRight
+  Kokkos::View<double* [3], Kokkos::LayoutRight, Kokkos::HostSpace> v("v", 5);
+  for (int i = 0; i < 5; ++i) {
+    for (int j = 0; j < 3; ++j) v(i, j) = i * 10 + j;
+  }
+
+  // Take a column (Rank 1 strided)
+  auto col = Kokkos::subview(v, Kokkos::ALL, 1);
+  auto range = microvtk::adapt(col);
+  EXPECT_EQ(std::ranges::size(range), 5);
+  auto it = std::ranges::begin(range);
+  EXPECT_DOUBLE_EQ(*it++, 1.0);
+  EXPECT_DOUBLE_EQ(*it++, 11.0);
+  EXPECT_DOUBLE_EQ(*it++, 21.0);
+}
 #endif
 
 #ifdef MICROVTK_HAS_CABANA
 #include <Cabana_Core.hpp>
 
+TEST(CabanaAdapterTest, IteratorOperations) {
+  using DataTypes = Cabana::MemberTypes<double[3]>;
+  Cabana::AoSoA<DataTypes, Kokkos::HostSpace> aosoa("a", 5);
+  auto slice = Cabana::slice<0>(aosoa);
+  for (int i = 0; i < 5; ++i)
+    for (int j = 0; j < 3; ++j) slice(i, j) = i * 10 + j;
+
+  auto flattened = microvtk::adapt(slice);
+  auto it = flattened.begin();
+
+  // Random access
+  EXPECT_DOUBLE_EQ(it[4], 11.0);       // Point 1, Comp 1
+  EXPECT_DOUBLE_EQ(*(it + 14), 42.0);  // Last element
+
+  // Equality
+  EXPECT_EQ(it + 15, flattened.end());
+}
 TEST(CabanaAdapterTest, AdaptSliceScalar) {
   using DataTypes = Cabana::MemberTypes<double>;
   const int num_tuples = 10;
