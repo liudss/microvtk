@@ -23,11 +23,34 @@ public:
   void setCompression(core::CompressionType type) { compressionType_ = type; }
 
   // 1. Set Points (Coordinates)
-  // range: x,y,z, x,y,z... (3 components)
+  // range: a flattened scalar sequence (x0, y0, z0, x1, y1, z1...)
+  // inputDim: components per point in the input range (1, 2, or 3)
   template <std::ranges::range R>
-  void setPoints(const R& points) {
-    numberOfPoints_ = std::ranges::size(points) / 3;
-    pointsBlock_ = registerData(points, "Points", 3);
+  void setPoints(const R& points, int inputDim = 3) {
+    if (inputDim == 3) {
+      numberOfPoints_ = std::ranges::size(points) / 3;
+      pointsBlock_ = registerData(points, "Points", 3);
+    } else {
+      // Automatic padding to 3D via lazy transform view
+      numberOfPoints_ = std::ranges::size(points) / inputDim;
+      auto view = std::views::all(points);
+
+      // We use a simple iota + transform to interleave 0.0 for missing
+      // components
+      auto padded =
+          std::views::iota(size_t{0}, numberOfPoints_ * 3) |
+          std::views::transform([view, inputDim](size_t i) -> double {
+            size_t ptIdx = i / 3;
+            size_t compIdx = i % 3;
+            if (compIdx < static_cast<size_t>(inputDim)) {
+              // Access the flattened input range
+              return static_cast<double>(
+                  view[ptIdx * static_cast<size_t>(inputDim) + compIdx]);
+            }
+            return 0.0;
+          });
+      pointsBlock_ = registerData(padded, "Points", 3);
+    }
   }
 
   // 2. Set Cells (Topology)

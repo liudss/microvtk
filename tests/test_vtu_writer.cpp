@@ -95,3 +95,94 @@ TEST(VtuWriter, OrderIndependence) {
 
   std::filesystem::remove(filename);
 }
+
+TEST(VtuWriter, AutoPadding) {
+  // Test 1D padding
+  {
+    VtuWriter writer;
+    std::vector<double> points1d = {1.0, 2.0, 3.0};  // 3 points in 1D
+    writer.setPoints(points1d, 1);
+
+    std::string filename = "test_padding_1d.vtu";
+    writer.write(filename);
+
+    std::ifstream ifs(filename, std::ios::binary);
+    std::string content((std::istreambuf_iterator<char>(ifs)),
+                        (std::istreambuf_iterator<char>()));
+
+    // Find the end of the XML part: ">_" starts the raw data
+    size_t start = content.find(">_");
+    ASSERT_NE(start, std::string::npos);
+    start += 2;  // Skip ">_"
+
+    // The first block is Points. VTK Appended format: [size_header][data]
+    uint64_t dataSize;
+    std::memcpy(&dataSize, &content[start], sizeof(uint64_t));
+    EXPECT_EQ(dataSize, 3 * 3 * sizeof(double));
+
+    const double* data =
+        reinterpret_cast<const double*>(&content[start + sizeof(uint64_t)]);
+    EXPECT_DOUBLE_EQ(data[0], 1.0);
+    EXPECT_DOUBLE_EQ(data[1], 0.0);
+    EXPECT_DOUBLE_EQ(data[2], 0.0);
+    EXPECT_DOUBLE_EQ(data[3], 2.0);
+    EXPECT_DOUBLE_EQ(data[4], 0.0);
+    EXPECT_DOUBLE_EQ(data[5], 0.0);
+    EXPECT_DOUBLE_EQ(data[6], 3.0);
+    EXPECT_DOUBLE_EQ(data[7], 0.0);
+    EXPECT_DOUBLE_EQ(data[8], 0.0);
+
+    std::filesystem::remove(filename);
+  }
+  // Test 2D padding
+  {
+    VtuWriter writer;
+    std::vector<double> points2d = {1.0, 1.1, 2.0, 2.2};  // 2 points in 2D
+    writer.setPoints(points2d, 2);
+
+    std::string filename = "test_padding_2d.vtu";
+    writer.write(filename);
+
+    std::ifstream ifs(filename, std::ios::binary);
+    std::string content((std::istreambuf_iterator<char>(ifs)),
+                        (std::istreambuf_iterator<char>()));
+
+    size_t start = content.find(">_") + 2;
+    const double* data =
+        reinterpret_cast<const double*>(&content[start + sizeof(uint64_t)]);
+
+    EXPECT_DOUBLE_EQ(data[0], 1.0);
+    EXPECT_DOUBLE_EQ(data[1], 1.1);
+    EXPECT_DOUBLE_EQ(data[2], 0.0);
+    EXPECT_DOUBLE_EQ(data[3], 2.0);
+    EXPECT_DOUBLE_EQ(data[4], 2.2);
+    EXPECT_DOUBLE_EQ(data[5], 0.0);
+
+    std::filesystem::remove(filename);
+  }
+
+  // Test with a mock "Adapted" range (simulating Kokkos::View<double*[2]>)
+  {
+    VtuWriter writer;
+    std::vector<double> raw = {10.0, 20.0};  // 1 point in 2D
+    auto adapted = std::views::all(raw);
+    writer.setPoints(adapted, 2);
+
+    std::string filename = "test_padding_adapted.vtu";
+    writer.write(filename);
+
+    std::ifstream ifs(filename, std::ios::binary);
+    std::string content((std::istreambuf_iterator<char>(ifs)),
+                        (std::istreambuf_iterator<char>()));
+
+    size_t start = content.find(">_") + 2;
+    const double* data =
+        reinterpret_cast<const double*>(&content[start + sizeof(uint64_t)]);
+
+    EXPECT_DOUBLE_EQ(data[0], 10.0);
+    EXPECT_DOUBLE_EQ(data[1], 20.0);
+    EXPECT_DOUBLE_EQ(data[2], 0.0);
+
+    std::filesystem::remove(filename);
+  }
+}
