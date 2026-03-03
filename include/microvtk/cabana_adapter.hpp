@@ -17,6 +17,12 @@ struct extract_data_type<
   using type = DataType;
 };
 
+/**
+ * @brief A standard-compliant C++20 view for Cabana Slices.
+ * Flattens multi-dimensional array slices into a scalar range.
+ * This view maintains a pointer to the slice to ensure it is movable
+ * (view-compliant) while avoiding slice handle copies.
+ */
 template <typename SliceType>
 class CabanaFlattenedView
     : public std::ranges::view_interface<CabanaFlattenedView<SliceType>> {
@@ -30,21 +36,21 @@ public:
 
   static constexpr size_t NumComponents = get_num_components();
 
-  explicit CabanaFlattenedView(const SliceType& slice) : slice_(slice) {}
+  CabanaFlattenedView() = default;
+  explicit CabanaFlattenedView(const SliceType& slice) : slice_ptr_(&slice) {}
 
-  [[nodiscard]] auto size() const { return slice_.size() * NumComponents; }
+  [[nodiscard]] auto size() const { return slice_ptr_->size() * NumComponents; }
 
   struct Iterator {
     using iterator_category = std::random_access_iterator_tag;
+    using iterator_concept = std::random_access_iterator_tag;
     using difference_type = std::ptrdiff_t;
     using value_type = ScalarType;
     using reference = ScalarType;
     using pointer = void;
 
-    const SliceType* s;
-    size_t idx;
-
-    // Tag dispatching to handle Scalar vs Array slice access
+    const SliceType* s = nullptr;
+    size_t idx = 0;
 
     // Scalar access: Rank 0
     template <size_t R>
@@ -60,18 +66,12 @@ public:
     [[nodiscard]] reference access(std::integral_constant<size_t, R>,
                                    size_t t_idx, size_t c_idx) const {
       if constexpr (R == 1) {
-        // Optimization for 1D array
         return (*s)(t_idx, c_idx);
       } else {
-        // Generic Multidimensional Array (Tensor)
-        // Map flat component index c_idx to (d0, d1...)
-        // ValueType is e.g. double[3][3]
         using T = ValueType;
         size_t indices[R];
         size_t temp = c_idx;
 
-        // Compute indices from last dimension to first
-        // We need extents of each dimension of T
         auto compute_idx = [&]<size_t... Is>(std::index_sequence<Is...>) {
           auto compute_one = [&](auto i_rev) {
             constexpr size_t d = R - 1 - i_rev;
@@ -165,13 +165,17 @@ public:
     }
   };
 
-  [[nodiscard]] auto begin() const { return Iterator{&slice_, 0}; }
-  [[nodiscard]] auto end() const { return Iterator{&slice_, size()}; }
+  [[nodiscard]] auto begin() const { return Iterator{slice_ptr_, 0}; }
+  [[nodiscard]] auto end() const { return Iterator{slice_ptr_, size()}; }
 
 private:
-  const SliceType& slice_;
+  const SliceType* slice_ptr_ = nullptr;
 };
 
+/**
+ * @brief Adapt a Cabana Slice into a scalar-flattened range.
+ * The user must ensure the slice object remains valid while the view is in use.
+ */
 template <typename SliceType>
 [[nodiscard]] auto adapt(const SliceType& slice) {
   return CabanaFlattenedView<SliceType>(slice);
