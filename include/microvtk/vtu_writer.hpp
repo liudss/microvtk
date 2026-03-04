@@ -25,8 +25,13 @@ public:
   // 1. Set Points (Coordinates)
   // range: a flattened scalar sequence (x0, y0, z0, x1, y1, z1...)
   // inputDim: components per point in the input range (1, 2, or 3)
-  template <std::ranges::range R>
+  template <std::ranges::random_access_range R>
   void setPoints(const R& points, int inputDim = 3) {
+    if (inputDim < 1 || inputDim > 3) {
+      throw std::invalid_argument(
+          "VtuWriter::setPoints: inputDim must be 1, 2, or 3.");
+    }
+
     if (inputDim == 3) {
       numberOfPoints_ = std::ranges::size(points) / 3;
       pointsBlock_ = registerData(points, "Points", 3);

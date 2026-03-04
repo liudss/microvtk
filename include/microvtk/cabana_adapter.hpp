@@ -39,7 +39,9 @@ public:
   CabanaFlattenedView() = default;
   explicit CabanaFlattenedView(const SliceType& slice) : slice_ptr_(&slice) {}
 
-  [[nodiscard]] auto size() const { return slice_ptr_->size() * NumComponents; }
+  [[nodiscard]] auto size() const {
+    return slice_ptr_ ? slice_ptr_->size() * NumComponents : 0;
+  }
 
   struct Iterator {
     using iterator_category = std::random_access_iterator_tag;
