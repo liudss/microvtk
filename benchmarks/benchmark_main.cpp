@@ -1,7 +1,7 @@
 #include <array>
 #include <benchmark/benchmark.h>
+#include <deque>
 #include <filesystem>
-#include <list>
 #include <microvtk/core/compressor.hpp>
 #include <microvtk/microvtk.hpp>
 #include <numeric>
@@ -139,11 +139,11 @@ BENCHMARK(BM_WriteCompressed)
 
 static void BM_WriteNonContiguous(benchmark::State& state) {
   auto num_points = static_cast<size_t>(state.range(0));
-  // std::list is a non-contiguous container
-  std::list<double> points_list;
+  // std::deque is a non-contiguous but random-access container
+  std::deque<double> points_deque;
   {
     std::vector<double> tmp = GeneratePoints(num_points);
-    std::ranges::copy(tmp, std::back_inserter(points_list));
+    std::ranges::copy(tmp, std::back_inserter(points_deque));
   }
 
   std::string filename = "bench_list_" + std::to_string(num_points) + ".vtu";
@@ -151,7 +151,7 @@ static void BM_WriteNonContiguous(benchmark::State& state) {
   for (auto _ : state) {
     (void)_;
     VtuWriter writer(DataFormat::Appended);
-    writer.setPoints(points_list);
+    writer.setPoints(points_deque);
     writer.write(filename);
   }
   std::filesystem::remove(filename);

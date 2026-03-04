@@ -28,26 +28,24 @@ auto view(const Container& c) noexcept {
 namespace detail {
 template <typename MemberType, typename ClassType>
 struct adapt_closure {
-  MemberType ClassType::*member;
+  MemberType ClassType::* member;
 
   template <std::ranges::range R>
   friend auto operator|(R&& r, const adapt_closure& closure) {
     return std::forward<R>(r) |
            std::views::transform(
-               [m = closure.member](const auto& obj) -> const MemberType& {
-                 return obj.*m;
-               });
+               [m = closure.member](const auto& obj) { return obj.*m; });
   }
 };
 }  // namespace detail
 
 template <typename MemberType, typename ClassType>
-auto adapt(MemberType ClassType::*member) noexcept {
+auto adapt(MemberType ClassType::* member) noexcept {
   return detail::adapt_closure<MemberType, ClassType>{member};
 }
 
 template <std::ranges::range Container, typename MemberType, typename ClassType>
-auto adapt(const Container& c, MemberType ClassType::*member) noexcept {
+auto adapt(const Container& c, MemberType ClassType::* member) noexcept {
   return c | adapt(member);
 }
 

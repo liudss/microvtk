@@ -1,4 +1,5 @@
 #include <filesystem>
+#include <fstream>
 #include <gtest/gtest.h>
 #include <microvtk/vtu_writer.hpp>
 #include <vector>
@@ -30,13 +31,15 @@ TEST(VtuWriter, SimpleWrite) {
   // Verify file exists and has some content
   ASSERT_TRUE(std::filesystem::exists(filename));
 
-  std::ifstream ifs(filename);
-  std::string content((std::istreambuf_iterator<char>(ifs)),
-                      (std::istreambuf_iterator<char>()));
+  {
+    std::ifstream ifs(filename);
+    std::string content((std::istreambuf_iterator<char>(ifs)),
+                        (std::istreambuf_iterator<char>()));
 
-  EXPECT_TRUE(content.find("<VTKFile") != std::string::npos);
-  EXPECT_TRUE(content.find("AppendedData") != std::string::npos);
-  EXPECT_TRUE(content.find("ScalarField") != std::string::npos);
+    EXPECT_TRUE(content.find("<VTKFile") != std::string::npos);
+    EXPECT_TRUE(content.find("AppendedData") != std::string::npos);
+    EXPECT_TRUE(content.find("ScalarField") != std::string::npos);
+  }
 
   // Cleanup
   std::filesystem::remove(filename);
@@ -65,33 +68,35 @@ TEST(VtuWriter, OrderIndependence) {
 
   ASSERT_TRUE(std::filesystem::exists(filename));
 
-  std::ifstream ifs(filename);
-  std::string content((std::istreambuf_iterator<char>(ifs)),
-                      (std::istreambuf_iterator<char>()));
+  {
+    std::ifstream ifs(filename);
+    std::string content((std::istreambuf_iterator<char>(ifs)),
+                        (std::istreambuf_iterator<char>()));
 
-  // Extract offsets for Points and ScalarField
-  auto findOffset = [&](std::string_view name) -> std::string {
-    size_t pos = content.find(name);
-    if (pos == std::string::npos) return "";
-    size_t offsetPos = content.find("offset=\"", pos);
-    if (offsetPos == std::string::npos) return "";
-    size_t start = offsetPos + 8;
-    size_t end = content.find("\"", start);
-    return content.substr(start, end - start);
-  };
+    // Extract offsets for Points and ScalarField
+    auto findOffset = [&](std::string_view name) -> std::string {
+      size_t pos = content.find(name);
+      if (pos == std::string::npos) return "";
+      size_t offsetPos = content.find("offset=\"", pos);
+      if (offsetPos == std::string::npos) return "";
+      size_t start = offsetPos + 8;
+      size_t end = content.find("\"", start);
+      return content.substr(start, end - start);
+    };
 
-  std::string pointsOffset = findOffset("Points");
-  std::string fieldOffset = findOffset("ScalarField");
+    std::string pointsOffset = findOffset("Points");
+    std::string fieldOffset = findOffset("ScalarField");
 
-  EXPECT_FALSE(pointsOffset.empty());
-  EXPECT_FALSE(fieldOffset.empty());
+    EXPECT_FALSE(pointsOffset.empty());
+    EXPECT_FALSE(fieldOffset.empty());
 
-  // With logical ordering: Points (first) should have offset 0
-  // ScalarField should have a non-zero offset because it comes after Points and
-  // Cells
-  EXPECT_EQ(pointsOffset, "0");
-  EXPECT_NE(fieldOffset, "0");
-  EXPECT_NE(pointsOffset, fieldOffset);
+    // With logical ordering: Points (first) should have offset 0
+    // ScalarField should have a non-zero offset because it comes after Points
+    // and Cells
+    EXPECT_EQ(pointsOffset, "0");
+    EXPECT_NE(fieldOffset, "0");
+    EXPECT_NE(pointsOffset, fieldOffset);
+  }
 
   std::filesystem::remove(filename);
 }
@@ -106,31 +111,33 @@ TEST(VtuWriter, AutoPadding) {
     std::string filename = "test_padding_1d.vtu";
     writer.write(filename);
 
-    std::ifstream ifs(filename, std::ios::binary);
-    std::string content((std::istreambuf_iterator<char>(ifs)),
-                        (std::istreambuf_iterator<char>()));
+    {
+      std::ifstream ifs(filename, std::ios::binary);
+      std::string content((std::istreambuf_iterator<char>(ifs)),
+                          (std::istreambuf_iterator<char>()));
 
-    // Find the end of the XML part: ">_" starts the raw data
-    size_t start = content.find(">_");
-    ASSERT_NE(start, std::string::npos);
-    start += 2;  // Skip ">_"
+      // Find the end of the XML part: ">_" starts the raw data
+      size_t start = content.find(">_");
+      ASSERT_NE(start, std::string::npos);
+      start += 2;  // Skip ">_"
 
-    // The first block is Points. VTK Appended format: [size_header][data]
-    uint64_t dataSize;
-    std::memcpy(&dataSize, &content[start], sizeof(uint64_t));
-    EXPECT_EQ(dataSize, 3 * 3 * sizeof(double));
+      // The first block is Points. VTK Appended format: [size_header][data]
+      uint64_t dataSize;
+      std::memcpy(&dataSize, &content[start], sizeof(uint64_t));
+      EXPECT_EQ(dataSize, 3 * 3 * sizeof(double));
 
-    const double* data =
-        reinterpret_cast<const double*>(&content[start + sizeof(uint64_t)]);
-    EXPECT_DOUBLE_EQ(data[0], 1.0);
-    EXPECT_DOUBLE_EQ(data[1], 0.0);
-    EXPECT_DOUBLE_EQ(data[2], 0.0);
-    EXPECT_DOUBLE_EQ(data[3], 2.0);
-    EXPECT_DOUBLE_EQ(data[4], 0.0);
-    EXPECT_DOUBLE_EQ(data[5], 0.0);
-    EXPECT_DOUBLE_EQ(data[6], 3.0);
-    EXPECT_DOUBLE_EQ(data[7], 0.0);
-    EXPECT_DOUBLE_EQ(data[8], 0.0);
+      const double* data =
+          reinterpret_cast<const double*>(&content[start + sizeof(uint64_t)]);
+      EXPECT_DOUBLE_EQ(data[0], 1.0);
+      EXPECT_DOUBLE_EQ(data[1], 0.0);
+      EXPECT_DOUBLE_EQ(data[2], 0.0);
+      EXPECT_DOUBLE_EQ(data[3], 2.0);
+      EXPECT_DOUBLE_EQ(data[4], 0.0);
+      EXPECT_DOUBLE_EQ(data[5], 0.0);
+      EXPECT_DOUBLE_EQ(data[6], 3.0);
+      EXPECT_DOUBLE_EQ(data[7], 0.0);
+      EXPECT_DOUBLE_EQ(data[8], 0.0);
+    }
 
     std::filesystem::remove(filename);
   }
@@ -143,20 +150,22 @@ TEST(VtuWriter, AutoPadding) {
     std::string filename = "test_padding_2d.vtu";
     writer.write(filename);
 
-    std::ifstream ifs(filename, std::ios::binary);
-    std::string content((std::istreambuf_iterator<char>(ifs)),
-                        (std::istreambuf_iterator<char>()));
+    {
+      std::ifstream ifs(filename, std::ios::binary);
+      std::string content((std::istreambuf_iterator<char>(ifs)),
+                          (std::istreambuf_iterator<char>()));
 
-    size_t start = content.find(">_") + 2;
-    const double* data =
-        reinterpret_cast<const double*>(&content[start + sizeof(uint64_t)]);
+      size_t start = content.find(">_") + 2;
+      const double* data =
+          reinterpret_cast<const double*>(&content[start + sizeof(uint64_t)]);
 
-    EXPECT_DOUBLE_EQ(data[0], 1.0);
-    EXPECT_DOUBLE_EQ(data[1], 1.1);
-    EXPECT_DOUBLE_EQ(data[2], 0.0);
-    EXPECT_DOUBLE_EQ(data[3], 2.0);
-    EXPECT_DOUBLE_EQ(data[4], 2.2);
-    EXPECT_DOUBLE_EQ(data[5], 0.0);
+      EXPECT_DOUBLE_EQ(data[0], 1.0);
+      EXPECT_DOUBLE_EQ(data[1], 1.1);
+      EXPECT_DOUBLE_EQ(data[2], 0.0);
+      EXPECT_DOUBLE_EQ(data[3], 2.0);
+      EXPECT_DOUBLE_EQ(data[4], 2.2);
+      EXPECT_DOUBLE_EQ(data[5], 0.0);
+    }
 
     std::filesystem::remove(filename);
   }
@@ -171,17 +180,19 @@ TEST(VtuWriter, AutoPadding) {
     std::string filename = "test_padding_adapted.vtu";
     writer.write(filename);
 
-    std::ifstream ifs(filename, std::ios::binary);
-    std::string content((std::istreambuf_iterator<char>(ifs)),
-                        (std::istreambuf_iterator<char>()));
+    {
+      std::ifstream ifs(filename, std::ios::binary);
+      std::string content((std::istreambuf_iterator<char>(ifs)),
+                          (std::istreambuf_iterator<char>()));
 
-    size_t start = content.find(">_") + 2;
-    const double* data =
-        reinterpret_cast<const double*>(&content[start + sizeof(uint64_t)]);
+      size_t start = content.find(">_") + 2;
+      const double* data =
+          reinterpret_cast<const double*>(&content[start + sizeof(uint64_t)]);
 
-    EXPECT_DOUBLE_EQ(data[0], 10.0);
-    EXPECT_DOUBLE_EQ(data[1], 20.0);
-    EXPECT_DOUBLE_EQ(data[2], 0.0);
+      EXPECT_DOUBLE_EQ(data[0], 10.0);
+      EXPECT_DOUBLE_EQ(data[1], 20.0);
+      EXPECT_DOUBLE_EQ(data[2], 0.0);
+    }
 
     std::filesystem::remove(filename);
   }
