@@ -185,7 +185,14 @@ if(MICROVTK_ENABLE_PYTHON)
         message(STATUS "MicroVTK: Using nanobind from external/ submodule.")
         add_subdirectory(external/nanobind EXCLUDE_FROM_ALL)
     else()
-        message(FATAL_ERROR "MicroVTK: Python bindings enabled but nanobind not found. Add it to external/ or provide it as a target.")
+        message(STATUS "MicroVTK: nanobind not found in external/, using FetchContent.")
+        include(FetchContent)
+        FetchContent_Declare(
+          nanobind
+          GIT_REPOSITORY https://github.com/wjakob/nanobind.git
+          GIT_TAG        v2.4.0
+        )
+        FetchContent_MakeAvailable(nanobind)
     endif()
 
     add_subdirectory(python)
