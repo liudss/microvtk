@@ -178,5 +178,6 @@ NB_MODULE(_microvtk, m) {
       .def("add_step", &PvdWriter::addStep, "time"_a, "vtu_file"_a,
            "Add a time step to the series.")
       .def("save", &PvdWriter::save, "Save the PVD file to disk.");
+}
 
 }  // namespace microvtk
