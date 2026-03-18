@@ -6,6 +6,9 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+# Ensure all targets are built with -fPIC (needed for Python bindings)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
 # Options
 option(MICROVTK_BUILD_TESTS "Build unit tests" OFF)
 option(MICROVTK_BUILD_EXAMPLES "Build examples" OFF)
@@ -14,6 +17,7 @@ option(MICROVTK_USE_ZLIB "Enable ZLib compression support" ON)
 option(MICROVTK_USE_LZ4 "Enable LZ4 compression support" ON)
 option(MICROVTK_USE_KOKKOS "Enable Kokkos adapter support" OFF)
 option(MICROVTK_USE_CABANA "Enable Cabana adapter support" OFF)
+option(MICROVTK_ENABLE_PYTHON "Enable Python bindings" OFF)
 
 # Default to ON if top-level project
 if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
@@ -25,40 +29,33 @@ endif()
 # Dependencies
 if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
     # -------------------------------------------------------------------------
-    # Development / Standalone Build: Use Bundled Dependencies (Submodules)
+    # Development / Standalone Build: Try Submodules, then FetchContent
     # -------------------------------------------------------------------------
-    message(STATUS "MicroVTK: Building in standalone mode, using bundled dependencies.")
+    message(STATUS "MicroVTK: Building in standalone mode.")
+    include(FetchContent)
 
     # ZLIB
     if(MICROVTK_USE_ZLIB)
         if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/external/zlib/CMakeLists.txt")
             set(ZLIB_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
             set(ZLIB_BUILD_TESTING OFF CACHE BOOL "" FORCE)
-            # Force static build for dependencies to avoid DLL issues
-            set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build shared libraries" FORCE)
-            set(ZLIB_BUILD_SHARED OFF CACHE BOOL "Build shared zlib" FORCE)
-            set(ZLIB_BUILD_STATIC ON CACHE BOOL "Build static zlib" FORCE)
+            set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+            set(ZLIB_BUILD_SHARED OFF CACHE BOOL "" FORCE)
+            set(ZLIB_BUILD_STATIC ON CACHE BOOL "" FORCE)
             add_subdirectory(external/zlib)
-            if(NOT TARGET ZLIB::ZLIB)
-                if(TARGET zlibstatic)
-                     add_library(ZLIB::ZLIB ALIAS zlibstatic)
-                elseif(TARGET zlib)
-                     add_library(ZLIB::ZLIB ALIAS zlib)
-                endif()
-            endif()
-            # zlib typically adds its source dir to include path for itself,
-            # but we need to ensure interface includes if it doesn't propagate them nicely in older versions.
-            if(TARGET zlib)
-                target_include_directories(zlib INTERFACE
-                    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/external/zlib>
-                )
-            elseif(TARGET zlibstatic)
-                target_include_directories(zlibstatic INTERFACE
-                    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/external/zlib>
-                )
-            endif()
         else()
-            message(FATAL_ERROR "ZLIB enabled but external/zlib not found. Did you run 'git submodule update --init'?")
+            message(STATUS "MicroVTK: zlib submodule not found, using FetchContent.")
+            FetchContent_Declare(zlib GIT_REPOSITORY https://github.com/madler/zlib.git GIT_TAG v1.3.1)
+            set(ZLIB_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+            FetchContent_MakeAvailable(zlib)
+        endif()
+
+        if(NOT TARGET ZLIB::ZLIB)
+            if(TARGET zlibstatic)
+                 add_library(ZLIB::ZLIB ALIAS zlibstatic)
+            elseif(TARGET zlib)
+                 add_library(ZLIB::ZLIB ALIAS zlib)
+            endif()
         endif()
     endif()
 
@@ -68,10 +65,12 @@ if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
             set(LZ4_BUILD_CLI OFF CACHE BOOL "" FORCE)
             set(LZ4_BUILD_LEGACY_LZ4C OFF CACHE BOOL "" FORCE)
             add_subdirectory(external/lz4/build/cmake)
-            # LZ4 cmake usually defines target 'lz4_static' or 'lz4_shared' depending on options.
-            # It creates an alias 'lz4::lz4' usually.
         else()
-            message(FATAL_ERROR "LZ4 enabled but external/lz4 not found. Did you run 'git submodule update --init'?")
+            message(STATUS "MicroVTK: lz4 submodule not found, using FetchContent.")
+            FetchContent_Declare(lz4 GIT_REPOSITORY https://github.com/lz4/lz4.git SOURCE_SUBDIR build/cmake GIT_TAG v1.10.0)
+            set(LZ4_BUILD_CLI OFF CACHE BOOL "" FORCE)
+            set(LZ4_BUILD_LEGACY_LZ4C OFF CACHE BOOL "" FORCE)
+            FetchContent_MakeAvailable(lz4)
         endif()
     endif()
 
@@ -80,10 +79,15 @@ if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
         if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/external/kokkos/CMakeLists.txt")
             set(Kokkos_ENABLE_TESTS OFF CACHE BOOL "" FORCE)
             set(Kokkos_ENABLE_EXAMPLES OFF CACHE BOOL "" FORCE)
-            set(Kokkos_ENABLE_IMPL_VIEW_LEGACY ON CACHE BOOL "" FORCE) # Required for Cabana
+            set(Kokkos_ENABLE_IMPL_VIEW_LEGACY ON CACHE BOOL "" FORCE)
             add_subdirectory(external/kokkos)
         else()
-            message(FATAL_ERROR "Kokkos enabled but external/kokkos not found. Did you run 'git submodule update --init'?")
+            message(STATUS "MicroVTK: Kokkos submodule not found, using FetchContent.")
+            FetchContent_Declare(kokkos GIT_REPOSITORY https://github.com/kokkos/kokkos.git GIT_TAG 4.4.01)
+            set(Kokkos_ENABLE_TESTS OFF CACHE BOOL "" FORCE)
+            set(Kokkos_ENABLE_EXAMPLES OFF CACHE BOOL "" FORCE)
+            set(Kokkos_ENABLE_IMPL_VIEW_LEGACY ON CACHE BOOL "" FORCE)
+            FetchContent_MakeAvailable(kokkos)
         endif()
     endif()
 
@@ -92,13 +96,14 @@ if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
         if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/external/cabana/CMakeLists.txt")
             set(Cabana_ENABLE_TESTING OFF CACHE BOOL "" FORCE)
             set(Cabana_ENABLE_EXAMPLES OFF CACHE BOOL "" FORCE)
-
-            # Allow Cabana to find our internal Kokkos target via cmake/FindKokkos.cmake
             list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
-
             add_subdirectory(external/cabana)
         else()
-             message(FATAL_ERROR "Cabana enabled but external/cabana not found. Did you run 'git submodule update --init'?")
+            message(STATUS "MicroVTK: Cabana submodule not found, using FetchContent.")
+            FetchContent_Declare(cabana GIT_REPOSITORY https://github.com/ECP-copa/Cabana.git GIT_TAG v0.6.0)
+            set(Cabana_ENABLE_TESTING OFF CACHE BOOL "" FORCE)
+            set(Cabana_ENABLE_EXAMPLES OFF CACHE BOOL "" FORCE)
+            FetchContent_MakeAvailable(cabana)
         endif()
     endif()
 
@@ -167,7 +172,24 @@ if(MICROVTK_USE_CABANA)
     target_link_libraries(microvtk INTERFACE Cabana::cabanacore)
 endif()
 
+# Python Bindings
+if(MICROVTK_ENABLE_PYTHON)
+    # Find Python first to ensure nanobind can find it
+    find_package(Python REQUIRED COMPONENTS Interpreter Development.Module)
 
+    # Check if nanobind target is already available (Monorepo via FetchContent)
+    if(TARGET nanobind::nanobind-static OR TARGET nanobind)
+        message(STATUS "MicroVTK: Using existing nanobind target.")
+    # Otherwise check external submodule (Standalone)
+    elseif(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/external/nanobind/CMakeLists.txt")
+        message(STATUS "MicroVTK: Using nanobind from external/ submodule.")
+        add_subdirectory(external/nanobind EXCLUDE_FROM_ALL)
+    else()
+        message(FATAL_ERROR "MicroVTK: Python bindings enabled but nanobind not found. Add it to external/ or provide it as a target.")
+    endif()
+
+    add_subdirectory(python)
+endif()
 
 # Helper for strict warnings (only applied to internal targets)
 function(microvtk_set_strict_warnings target)
