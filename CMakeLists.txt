@@ -106,11 +106,11 @@ else()
     # -------------------------------------------------------------------------
     # Library Usage Mode: Use System/User Provided Dependencies
     # -------------------------------------------------------------------------
-    if(MICROVTK_USE_ZLIB)
+    if(MICROVTK_USE_ZLIB AND NOT TARGET ZLIB::ZLIB)
         find_package(ZLIB REQUIRED)
     endif()
 
-    if(MICROVTK_USE_LZ4)
+    if(MICROVTK_USE_LZ4 AND NOT TARGET lz4::lz4 AND NOT TARGET lz4_static)
         # Try finding LZ4 via Config mode first, then PkgConfig
         find_package(lz4 CONFIG)
         if(NOT lz4_FOUND)
@@ -119,11 +119,11 @@ else()
         endif()
     endif()
 
-    if(MICROVTK_USE_KOKKOS)
+    if(MICROVTK_USE_KOKKOS AND NOT TARGET Kokkos::kokkos)
         find_package(Kokkos REQUIRED)
     endif()
 
-    if(MICROVTK_USE_CABANA)
+    if(MICROVTK_USE_CABANA AND NOT TARGET Cabana::cabanacore)
         find_package(Cabana REQUIRED)
     endif()
 endif()
