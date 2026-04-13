@@ -1,3 +1,4 @@
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <gtest/gtest.h>
@@ -96,6 +97,41 @@ TEST(VtuWriter, OrderIndependence) {
     EXPECT_EQ(pointsOffset, "0");
     EXPECT_NE(fieldOffset, "0");
     EXPECT_NE(pointsOffset, fieldOffset);
+  }
+
+  std::filesystem::remove(filename);
+}
+
+TEST(VtuWriter, UncompressedAppendedDataUsesLogicalOrder) {
+  VtuWriter writer;
+
+  std::vector<float> pointData = {1.1F, 2.2F, 3.3F};
+  writer.addPointData("ScalarField", pointData);
+
+  std::vector<double> points = {0.0, 0.0, 0.0, 1.0, 0.0,
+                                0.0, 0.0, 1.0, 0.0};
+  writer.setPoints(points);
+
+  std::vector<int32_t> conn = {0, 1, 2};
+  std::vector<int32_t> offsets = {3};
+  std::vector<uint8_t> types = {static_cast<uint8_t>(CellType::Triangle)};
+  writer.setCells(conn, offsets, types);
+
+  std::string filename = "test_uncompressed_order.vtu";
+  writer.write(filename);
+
+  {
+    std::ifstream ifs(filename, std::ios::binary);
+    std::string content((std::istreambuf_iterator<char>(ifs)),
+                        (std::istreambuf_iterator<char>()));
+
+    size_t start = content.find(">_");
+    ASSERT_NE(start, std::string::npos);
+    start += 2;
+
+    uint64_t dataSize = 0;
+    std::memcpy(&dataSize, &content[start], sizeof(uint64_t));
+    EXPECT_EQ(dataSize, points.size() * sizeof(double));
   }
 
   std::filesystem::remove(filename);

@@ -1,4 +1,5 @@
 #include <array>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <gtest/gtest.h>
@@ -100,6 +101,36 @@ TEST(VtiWriter, WorksWithAoS) {
   ASSERT_TRUE(std::filesystem::exists(filename));
 
   // Cleanup
+  std::filesystem::remove(filename);
+}
+
+TEST(VtiWriter, UncompressedAppendedDataUsesLogicalOrder) {
+  std::array<int, 6> extent = {0, 1, 0, 1, 0, 0};
+  VtiWriter writer(extent);
+
+  std::vector<int> cData = {100};
+  writer.addCellData("CellID", cData);
+
+  std::vector<double> pData = {1.0, 2.0, 3.0, 4.0};
+  writer.addPointData("PointScalars", pData);
+
+  std::string filename = "test_vti_uncompressed_order.vti";
+  writer.write(filename);
+
+  {
+    std::ifstream ifs(filename, std::ios::binary);
+    std::string content((std::istreambuf_iterator<char>(ifs)),
+                        (std::istreambuf_iterator<char>()));
+
+    size_t start = content.find(">_");
+    ASSERT_NE(start, std::string::npos);
+    start += 2;
+
+    uint64_t dataSize = 0;
+    std::memcpy(&dataSize, &content[start], sizeof(uint64_t));
+    EXPECT_EQ(dataSize, pData.size() * sizeof(double));
+  }
+
   std::filesystem::remove(filename);
 }
 
