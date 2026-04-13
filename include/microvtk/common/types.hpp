@@ -5,7 +5,7 @@
 
 namespace microvtk {
 
-enum class DataFormat : std::uint8_t { Ascii, Binary, Appended };
+enum class DataFormat : std::uint8_t { Appended };
 
 // Standard VTK Cell Types
 // Reference: https://vtk.org/doc/nightly/html/vtkCellType_8h_source.html

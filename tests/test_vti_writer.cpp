@@ -4,6 +4,7 @@
 #include <gtest/gtest.h>
 #include <microvtk/adapter.hpp>
 #include <microvtk/vti_writer.hpp>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -100,4 +101,18 @@ TEST(VtiWriter, WorksWithAoS) {
 
   // Cleanup
   std::filesystem::remove(filename);
+}
+
+TEST(VtiWriter, DataSizeMismatch) {
+  std::array<int, 6> extent = {0, 1, 0, 1, 0, 0};  // 4 points, 1 cell
+
+  VtiWriter writer(extent);
+  std::vector<double> pointData = {1.0, 2.0, 3.0};
+  writer.addPointData("bad_points", pointData);
+  EXPECT_THROW(writer.write("should_fail_points.vti"), std::invalid_argument);
+
+  VtiWriter writer2(extent);
+  std::vector<int> cellData = {1, 2};
+  writer2.addCellData("bad_cells", cellData);
+  EXPECT_THROW(writer2.write("should_fail_cells.vti"), std::invalid_argument);
 }

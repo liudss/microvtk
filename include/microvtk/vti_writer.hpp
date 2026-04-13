@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <array>
 #include <fstream>
 #include <memory>
@@ -44,6 +45,8 @@ public:
 
   // 3. Write to file
   void write(std::string_view filename) {
+    validateDataSizes();
+
     bool usingCompression = (compressionType_ != core::CompressionType::None);
     auto compressor = core::createCompressor(compressionType_);
 
@@ -73,8 +76,56 @@ private:
     uint64_t offset;
     std::string typeName;
     int numComponents;
+    size_t numberOfElements = 0;
     bool valid = false;
   };
+
+  [[nodiscard]] size_t pointCount() const {
+    size_t count = 1;
+    for (size_t axis = 0; axis < 3; ++axis) {
+      const int min = wholeExtent_[axis * 2];
+      const int max = wholeExtent_[axis * 2 + 1];
+      if (max < min) {
+        throw std::invalid_argument("VtiWriter: invalid extent.");
+      }
+      count *= static_cast<size_t>(max - min + 1);
+    }
+    return count;
+  }
+
+  [[nodiscard]] size_t cellCount() const {
+    size_t count = 1;
+    for (size_t axis = 0; axis < 3; ++axis) {
+      const int min = wholeExtent_[axis * 2];
+      const int max = wholeExtent_[axis * 2 + 1];
+      if (max < min) {
+        throw std::invalid_argument("VtiWriter: invalid extent.");
+      }
+      const auto pointCount = static_cast<size_t>(max - min + 1);
+      count *= std::max<size_t>(pointCount - 1, 1);
+    }
+    return count;
+  }
+
+  void validateDataSizes() const {
+    const auto expectedPointElements = pointCount();
+    const auto expectedCellElements = cellCount();
+
+    for (const auto& block : pointDataBlocks_) {
+      if (block.numberOfElements != expectedPointElements * block.numComponents) {
+        throw std::invalid_argument(
+            "VtiWriter::write: Size mismatch in PointData '" + block.name +
+            "'.");
+      }
+    }
+    for (const auto& block : cellDataBlocks_) {
+      if (block.numberOfElements != expectedCellElements * block.numComponents) {
+        throw std::invalid_argument(
+            "VtiWriter::write: Size mismatch in CellData '" + block.name +
+            "'.");
+      }
+    }
+  }
 
   void recomputeRawOffsets() {
     uint64_t runningOffset = 0;
@@ -225,6 +276,7 @@ private:
     info.offset = currentOffset_;
     info.typeName = vtkTypeName<std::remove_const_t<T>>();
     info.numComponents = numComponents;
+    info.numberOfElements = std::ranges::size(view);
     info.valid = true;
 
     auto accessor =
