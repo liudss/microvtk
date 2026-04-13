@@ -1,6 +1,9 @@
+#include <array>
+#include <cmath>
 #include <gtest/gtest.h>
 #include <microvtk/adapter.hpp>
 #include <microvtk/core/binary_utils.hpp>
+#include <ranges>
 #include <vector>
 
 using namespace microvtk;
@@ -39,6 +42,37 @@ TEST(Adapter, AdaptAoS) {
   core::append_range(masses, buffer);
   // 2 doubles = 16 bytes
   EXPECT_EQ(buffer.size(), 16);
+}
+
+TEST(Adapter, AdaptedRangeCanBeTransformed) {
+  std::vector<Particle> particles = {{.mass = 1.0, .id = 10},
+                                     {.mass = 2.0, .id = 20}};
+
+  auto doubled_masses = adapt(particles, &Particle::mass) |
+                        std::views::transform([](double mass) { return 2.0 * mass; });
+
+  static_assert(std::ranges::view<decltype(doubled_masses)>);
+  auto it = doubled_masses.begin();
+  EXPECT_DOUBLE_EQ(*it, 2.0);
+  EXPECT_DOUBLE_EQ(*(++it), 4.0);
+}
+
+struct VectorParticle {
+  std::array<double, 2> velocity;
+};
+
+TEST(Adapter, AdaptedVectorRangeCanBeTransformedToScalar) {
+  std::vector<VectorParticle> particles = {{{3.0, 4.0}}, {{5.0, 12.0}}};
+
+  auto speeds = adapt(particles, &VectorParticle::velocity) |
+                std::views::transform([](const auto& velocity) {
+                  return std::hypot(velocity[0], velocity[1]);
+                });
+
+  static_assert(std::ranges::view<decltype(speeds)>);
+  auto it = speeds.begin();
+  EXPECT_DOUBLE_EQ(*it, 5.0);
+  EXPECT_DOUBLE_EQ(*(++it), 13.0);
 }
 
 TEST(Adapter, ZeroCopyContract) {
