@@ -14,12 +14,15 @@ def find_executable(name):
     candidates = [
         "build_repro",
         "build",
+        "build/debug",
+        "build/release",
         "build/bin",
         "build/examples",
         "build/examples/Release",
         "build/examples/Debug",
         "build_release/examples",
         "build_release/examples/Release",
+        "build/msvc-debug",
         "build/msvc-debug/Debug"
     ]
 
@@ -125,3 +128,12 @@ def vti_adapt_file():
     run_example("example_vti_adapt", [output])
     yield output
     if os.path.exists(output): os.remove(output)
+
+@pytest.fixture(scope="module")
+def indexing_files():
+    """Runs example_indexing and yields the output files."""
+    outputs = ["morton_3d.vti", "morton_2d.vti", "morton_aos_combined.vti"]
+    run_example("example_indexing", outputs)
+    yield outputs
+    for f in outputs:
+        if os.path.exists(f): os.remove(f)

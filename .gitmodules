@@ -16,3 +16,6 @@
 [submodule "external/cabana"]
 	path = external/cabana
 	url = https://github.com/ECP-copa/Cabana.git
+[submodule "external/nanobind"]
+	path = external/nanobind
+	url = https://github.com/wjakob/nanobind.git
