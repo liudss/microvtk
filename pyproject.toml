@@ -1,5 +1,8 @@
 [build-system]
-requires = ["scikit-build-core", "nanobind"]
+requires = [
+    "scikit-build-core>=0.12",
+    "nanobind>=2.4",
+]
 build-backend = "scikit_build_core.build"
 
 [project]
@@ -16,6 +19,12 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+test = [
+    "pytest>=7.0.0",
+    "vtk>=9.0.0",
+]
+
+[dependency-groups]
 test = [
     "pytest>=7.0.0",
     "vtk>=9.0.0",

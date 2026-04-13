@@ -810,6 +810,13 @@ test = [
     { name = "vtk" },
 ]
 
+[package.dev-dependencies]
+test = [
+    { name = "pytest", version = "8.4.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
+    { name = "pytest", version = "9.0.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
+    { name = "vtk" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "numpy", specifier = ">=1.22" },
@@ -817,6 +824,12 @@ requires-dist = [
     { name = "vtk", marker = "extra == 'test'", specifier = ">=9.0.0" },
 ]
 provides-extras = ["test"]
+
+[package.metadata.requires-dev]
+test = [
+    { name = "pytest", specifier = ">=7.0.0" },
+    { name = "vtk", specifier = ">=9.0.0" },
+]
 
 [[package]]
 name = "numpy"

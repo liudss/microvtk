@@ -13,6 +13,7 @@ compile_commands.json
 .venv/
 __pycache__/
 .pytest_cache/
+*.so
 *.vtu
 *.vti
 *.pvd

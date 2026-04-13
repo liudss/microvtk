@@ -1,4 +1,6 @@
+#include <cstdint>
 #include <microvtk/common/types.hpp>
+#include <microvtk/core/compressor.hpp>
 #include <microvtk/pvd_writer.hpp>
 #include <microvtk/vti_writer.hpp>
 #include <microvtk/vtu_writer.hpp>
@@ -7,177 +9,161 @@
 #include <nanobind/stl/array.h>
 #include <nanobind/stl/string.h>
 #include <nanobind/stl/string_view.h>
-#include <nanobind/stl/vector.h>
+#include <span>
+#include <string>
+#include <string_view>
+#include <utility>
 
 namespace nb = nanobind;
 using namespace nb::literals;
 
 namespace microvtk {
+namespace {
 
-class PyVtuWriter {
+template <typename T>
+std::span<const T> as_span(
+    const nb::ndarray<T, nb::shape<-1>, nb::c_contig>& a) {
+  return {a.data(), a.size()};
+}
+
+template <typename Writer>
+class PyFieldWriter {
 public:
-  PyVtuWriter() : writer_(DataFormat::Appended) {}
+  template <typename T>
+  void add_point_data(std::string_view name,
+                      nb::ndarray<T, nb::shape<-1>, nb::c_contig> data,
+                      int components) {
+    writer_.addPointData(name, as_span(data), components);
+  }
+
+  template <typename T>
+  void add_cell_data(std::string_view name,
+                     nb::ndarray<T, nb::shape<-1>, nb::c_contig> data,
+                     int components) {
+    writer_.addCellData(name, as_span(data), components);
+  }
+
+  void set_compression(core::CompressionType type) {
+    writer_.setCompression(type);
+  }
+
+  void write(std::string_view filename) { writer_.write(filename); }
+
+protected:
+  template <typename... Args>
+  explicit PyFieldWriter(Args&&... args)
+      : writer_(std::forward<Args>(args)...) {}
+
+  Writer writer_;
+};
+
+class PyVtuWriter : public PyFieldWriter<VtuWriter> {
+public:
+  PyVtuWriter() : PyFieldWriter<VtuWriter>(DataFormat::Appended) {}
   PyVtuWriter(const PyVtuWriter&) = delete;
   PyVtuWriter& operator=(const PyVtuWriter&) = delete;
 
-  void set_compression(core::CompressionType type) {
-    writer_.setCompression(type);
+  template <typename T>
+  void set_points(nb::ndarray<T, nb::shape<-1>, nb::c_contig> points,
+                  int input_dim) {
+    writer_.setPoints(as_span(points), input_dim);
   }
 
-  void set_points(nb::object points_obj) {
-    auto points =
-        nb::cast<nb::ndarray<double, nb::shape<-1, -1>, nb::c_contig>>(
-            points_obj);
-    keep_alive_.push_back(points_obj);
-    int dim = static_cast<int>(points.shape(1));
-    auto span = std::span<const double>(points.data(), points.size());
-    writer_.setPoints(span, dim);
+  void set_cells(nb::ndarray<int32_t, nb::shape<-1>, nb::c_contig> connectivity,
+                 nb::ndarray<int32_t, nb::shape<-1>, nb::c_contig> offsets,
+                 nb::ndarray<uint8_t, nb::shape<-1>, nb::c_contig> types) {
+    writer_.setCells(as_span(connectivity), as_span(offsets), as_span(types));
   }
-
-  void set_cells(nb::object connectivity_obj, nb::object offsets_obj,
-                 nb::object types_obj) {
-    auto connectivity =
-        nb::cast<nb::ndarray<int32_t, nb::shape<-1>, nb::c_contig>>(
-            connectivity_obj);
-    auto offsets = nb::cast<nb::ndarray<int32_t, nb::shape<-1>, nb::c_contig>>(
-        offsets_obj);
-    auto types =
-        nb::cast<nb::ndarray<uint8_t, nb::shape<-1>, nb::c_contig>>(types_obj);
-
-    keep_alive_.push_back(connectivity_obj);
-    keep_alive_.push_back(offsets_obj);
-    keep_alive_.push_back(types_obj);
-
-    auto conn_span =
-        std::span<const int32_t>(connectivity.data(), connectivity.size());
-    auto off_span = std::span<const int32_t>(offsets.data(), offsets.size());
-    auto type_span = std::span<const uint8_t>(types.data(), types.size());
-
-    writer_.setCells(conn_span, off_span, type_span);
-  }
-
-  void add_point_data(std::string_view name, nb::object data_obj) {
-    auto data =
-        nb::cast<nb::ndarray<double, nb::shape<-1>, nb::c_contig>>(data_obj);
-    keep_alive_.push_back(data_obj);
-    auto span = std::span<const double>(data.data(), data.size());
-    writer_.addPointData(name, span);
-  }
-
-  void add_cell_data(std::string_view name, nb::object data_obj) {
-    auto data =
-        nb::cast<nb::ndarray<double, nb::shape<-1>, nb::c_contig>>(data_obj);
-    keep_alive_.push_back(data_obj);
-    auto span = std::span<const double>(data.data(), data.size());
-    writer_.addCellData(name, span);
-  }
-
-  void write(std::string_view filename) { writer_.write(filename); }
-
-private:
-  VtuWriter writer_;
-  std::vector<nb::object> keep_alive_;
 };
 
-class PyVtiWriter {
+class PyVtiWriter : public PyFieldWriter<VtiWriter> {
 public:
-  PyVtiWriter(const std::array<int, 6>& wholeExtent,
-              const std::array<double, 3>& origin = {0.0, 0.0, 0.0},
-              const std::array<double, 3>& spacing = {1.0, 1.0, 1.0})
-      : writer_(wholeExtent, origin, spacing) {}
+  PyVtiWriter(const std::array<int, 6>& extent,
+              const std::array<double, 3>& origin,
+              const std::array<double, 3>& spacing)
+      : PyFieldWriter<VtiWriter>(extent, origin, spacing) {}
   PyVtiWriter(const PyVtiWriter&) = delete;
   PyVtiWriter& operator=(const PyVtiWriter&) = delete;
-
-  void set_compression(core::CompressionType type) {
-    writer_.setCompression(type);
-  }
-
-  void add_point_data(std::string_view name, nb::object data_obj) {
-    auto data =
-        nb::cast<nb::ndarray<double, nb::shape<-1>, nb::c_contig>>(data_obj);
-    keep_alive_.push_back(data_obj);
-    auto span = std::span<const double>(data.data(), data.size());
-    writer_.addPointData(name, span);
-  }
-
-  void add_cell_data(std::string_view name, nb::object data_obj) {
-    auto data =
-        nb::cast<nb::ndarray<double, nb::shape<-1>, nb::c_contig>>(data_obj);
-    keep_alive_.push_back(data_obj);
-    auto span = std::span<const double>(data.data(), data.size());
-    writer_.addCellData(name, span);
-  }
-
-  void write(std::string_view filename) { writer_.write(filename); }
-
-private:
-  VtiWriter writer_;
-  std::vector<nb::object> keep_alive_;
 };
 
+template <typename PyWriter, typename Class, typename T>
+void bind_field_dtype(Class& cls, const char* suffix) {
+  cls.def((std::string("add_point_data_") + suffix).c_str(),
+          &PyWriter::template add_point_data<T>, "name"_a, "data"_a,
+          "components"_a);
+  cls.def((std::string("add_cell_data_") + suffix).c_str(),
+          &PyWriter::template add_cell_data<T>, "name"_a, "data"_a,
+          "components"_a);
+}
+
+template <typename Class, typename T>
+void bind_points_dtype(Class& cls, const char* suffix) {
+  cls.def((std::string("set_points_") + suffix).c_str(),
+          &PyVtuWriter::template set_points<T>, "points"_a, "input_dim"_a);
+}
+
+template <typename PyWriter, typename Class>
+void bind_field_dtypes(Class& cls) {
+  bind_field_dtype<PyWriter, Class, int8_t>(cls, "i8");
+  bind_field_dtype<PyWriter, Class, uint8_t>(cls, "u8");
+  bind_field_dtype<PyWriter, Class, int16_t>(cls, "i16");
+  bind_field_dtype<PyWriter, Class, uint16_t>(cls, "u16");
+  bind_field_dtype<PyWriter, Class, int32_t>(cls, "i32");
+  bind_field_dtype<PyWriter, Class, uint32_t>(cls, "u32");
+  bind_field_dtype<PyWriter, Class, int64_t>(cls, "i64");
+  bind_field_dtype<PyWriter, Class, uint64_t>(cls, "u64");
+  bind_field_dtype<PyWriter, Class, float>(cls, "f32");
+  bind_field_dtype<PyWriter, Class, double>(cls, "f64");
+}
+
+template <typename Class>
+void bind_point_dtypes(Class& cls) {
+  bind_points_dtype<Class, int8_t>(cls, "i8");
+  bind_points_dtype<Class, uint8_t>(cls, "u8");
+  bind_points_dtype<Class, int16_t>(cls, "i16");
+  bind_points_dtype<Class, uint16_t>(cls, "u16");
+  bind_points_dtype<Class, int32_t>(cls, "i32");
+  bind_points_dtype<Class, uint32_t>(cls, "u32");
+  bind_points_dtype<Class, int64_t>(cls, "i64");
+  bind_points_dtype<Class, uint64_t>(cls, "u64");
+  bind_points_dtype<Class, float>(cls, "f32");
+  bind_points_dtype<Class, double>(cls, "f64");
+}
+
+}  // namespace
+
 NB_MODULE(_microvtk, m) {
-  nb::enum_<core::CompressionType>(m, "CompressionType")
-      .value("NoCompression", core::CompressionType::None)
-      .value("ZLib", core::CompressionType::ZLib)
+  nb::enum_<core::CompressionType>(m, "Compression")
+      .value("None_", core::CompressionType::None)
+      .value("NONE", core::CompressionType::None)
+      .value("ZLIB", core::CompressionType::ZLib)
       .value("LZ4", core::CompressionType::LZ4);
 
-  nb::enum_<CellType>(m, "CellType")
-      .value("Vertex", CellType::Vertex)
-      .value("PolyVertex", CellType::PolyVertex)
-      .value("Line", CellType::Line)
-      .value("PolyLine", CellType::PolyLine)
-      .value("Triangle", CellType::Triangle)
-      .value("TriangleStrip", CellType::TriangleStrip)
-      .value("Polygon", CellType::Polygon)
-      .value("Pixel", CellType::Pixel)
-      .value("Quad", CellType::Quad)
-      .value("Tetra", CellType::Tetra)
-      .value("Voxel", CellType::Voxel)
-      .value("Hexahedron", CellType::Hexahedron)
-      .value("Wedge", CellType::Wedge)
-      .value("Pyramid", CellType::Pyramid);
-  nb::class_<PyVtuWriter>(m, "VtuWriter",
-                          "A writer for VTK Unstructured Grid (.vtu) files.")
-      .def(nb::init<>())
-      .def("set_compression", &PyVtuWriter::set_compression, "type"_a,
-           "Set the compression type for data arrays.")
-      .def("set_points", &PyVtuWriter::set_points, "points"_a,
-           "Set the point coordinates from a numpy array (N, 3).")
-      .def("set_cells", &PyVtuWriter::set_cells, "connectivity"_a, "offsets"_a,
-           "types"_a, "Set the cell topology from numpy arrays.")
-      .def("add_point_data", &PyVtuWriter::add_point_data, "name"_a, "data"_a,
-           "Add a point data attribute array.")
-      .def("add_cell_data", &PyVtuWriter::add_cell_data, "name"_a, "data"_a,
-           "Add a cell data attribute array.")
-      .def("write", &PyVtuWriter::write, "filename"_a,
-           "Write the data to a .vtu file.");
+  auto vtu =
+      nb::class_<PyVtuWriter>(m, "_VtuWriter",
+                              "Internal NumPy bridge for VTU writing.")
+          .def(nb::init<>())
+          .def("set_compression", &PyVtuWriter::set_compression, "type"_a)
+          .def("set_cells", &PyVtuWriter::set_cells, "connectivity"_a,
+               "offsets"_a, "types"_a)
+          .def("write", &PyVtuWriter::write, "filename"_a);
+  bind_field_dtypes<PyVtuWriter>(vtu);
+  bind_point_dtypes(vtu);
 
-  // --- VtiWriter ---
-  nb::class_<PyVtiWriter>(m, "VtiWriter",
-                          "A writer for VTK Image Data (.vti) files.")
-      .def(nb::init<const std::array<int, 6>&, const std::array<double, 3>&,
-                    const std::array<double, 3>&>(),
-           "wholeExtent"_a, "origin"_a = std::array<double, 3>{0, 0, 0},
-           "spacing"_a = std::array<double, 3>{1, 1, 1},
-           "Construct a VTI writer with the given extent, origin, and spacing.")
-      .def("set_compression", &PyVtiWriter::set_compression, "type"_a,
-           "Set the compression type for data arrays.")
-      .def("add_point_data", &PyVtiWriter::add_point_data, "name"_a, "data"_a,
-           "Add a point data attribute array.")
-      .def("add_cell_data", &PyVtiWriter::add_cell_data, "name"_a, "data"_a,
-           "Add a cell data attribute array.")
-      .def("write", &PyVtiWriter::write, "filename"_a,
-           "Write the data to a .vti file.");
+  auto vti =
+      nb::class_<PyVtiWriter>(m, "_VtiWriter",
+                              "Internal NumPy bridge for VTI writing.")
+          .def(nb::init<const std::array<int, 6>&, const std::array<double, 3>&,
+                        const std::array<double, 3>&>(),
+               "extent"_a, "origin"_a, "spacing"_a)
+          .def("set_compression", &PyVtiWriter::set_compression, "type"_a)
+          .def("write", &PyVtiWriter::write, "filename"_a);
+  bind_field_dtypes<PyVtiWriter>(vti);
 
-  // --- PvdWriter ---
-  nb::class_<PvdWriter>(
-      m, "PvdWriter",
-      "A writer for VTK Meta Data (.pvd) files to manage time series.")
-      .def(nb::init<std::string_view>(), "filename"_a,
-           "Create a PVD writer for the given filename.")
-      .def("add_step", &PvdWriter::addStep, "time"_a, "vtu_file"_a,
-           "Add a time step to the series.")
-      .def("save", &PvdWriter::save, "Save the PVD file to disk.");
+  nb::class_<PvdWriter>(m, "_PvdWriter")
+      .def(nb::init<std::string_view>(), "filename"_a)
+      .def("add_step", &PvdWriter::addStep, "time"_a, "file"_a)
+      .def("save", &PvdWriter::save);
 }
 
 }  // namespace microvtk
