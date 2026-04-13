@@ -1,9 +1,11 @@
+#include <bit>
 #include <deque>
 #include <gtest/gtest.h>
 #include <list>
 #include <microvtk/core/binary_utils.hpp>
 #include <microvtk/core/data_accessor.hpp>
 #include <sstream>
+#include <vector>
 
 using namespace microvtk::core;
 
@@ -25,6 +27,28 @@ TEST(DataAccessor, NonContiguousContainer) {
   EXPECT_EQ(ptr[2], 3);
   EXPECT_EQ(ptr[3], 4);
   EXPECT_EQ(ptr[4], 5);
+}
+
+TEST(DataAccessor, NonContiguousContainerHasNoDirectBytes) {
+  std::list<int32_t> data = {1, 2, 3};
+  RangeAccessor<std::list<int32_t>> accessor(data);
+
+  EXPECT_FALSE(accessor.contiguous_bytes().has_value());
+}
+
+TEST(DataAccessor, ContiguousContainerExposesDirectBytes) {
+  std::vector<int32_t> data = {10, 20};
+  auto view = std::views::all(data);
+  RangeAccessor<decltype(view)> accessor(view);
+
+  const auto bytes = accessor.contiguous_bytes();
+  if constexpr (std::endian::native == std::endian::little) {
+    ASSERT_TRUE(bytes.has_value());
+    EXPECT_EQ(bytes->size(), data.size() * sizeof(int32_t));
+    EXPECT_EQ(bytes->data(), reinterpret_cast<const uint8_t*>(data.data()));
+  } else {
+    EXPECT_FALSE(bytes.has_value());
+  }
 }
 
 TEST(DataAccessor, LegacyWriteTo) {

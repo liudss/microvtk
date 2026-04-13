@@ -10,6 +10,7 @@
 #include <microvtk/core/data_accessor.hpp>
 #include <microvtk/core/xml_utils.hpp>
 #include <ranges>
+#include <span>
 #include <string>
 #include <string_view>
 #include <type_traits>
@@ -171,10 +172,17 @@ private:
 
       auto& accessor = accessors_[block->accessorIndex];
       std::vector<uint8_t> tempRaw;
-      accessor->write_to(tempRaw);
+      const auto directBytes = accessor->contiguous_bytes();
+      std::span<const uint8_t> rawBytes;
+      if (directBytes) {
+        rawBytes = *directBytes;
+      } else {
+        accessor->write_to(tempRaw);
+        rawBytes = tempRaw;
+      }
 
-      originalSizes.push_back(tempRaw.size());
-      auto compressed = compressor->compress(tempRaw);
+      originalSizes.push_back(rawBytes.size());
+      auto compressed = compressor->compress(rawBytes);
       compressedBuffers.push_back(std::move(compressed));
 
       block->offset = runningOffset;

@@ -4,12 +4,12 @@
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 [![CI](https://github.com/liudss/microvtk/actions/workflows/ci.yml/badge.svg)](https://github.com/liudss/microvtk/actions/workflows/ci.yml)
 
-MicroVTK is a header-only C++20 library developed for high-performance computing (HPC) and scientific visualization applications. It facilitates the efficient generation of VTK XML artifacts (`.vtu`, `.vti`, `.pvd`) through a strictly zero-copy streaming architecture. The library adheres to modern C++ standards to ensure type safety, minimal memory footprint, and seamless interoperability with contemporary simulation frameworks.
+MicroVTK is a header-only C++20 library for high-performance computing (HPC) and scientific visualization workflows. It writes VTK XML artifacts (`.vtu`, `.vti`, `.pvd`) with a streaming-oriented design that keeps memory overhead low and avoids redundant copies on the common contiguous-data paths. The library uses modern C++ range-based adapters to provide type-safe interoperability with contemporary simulation frameworks.
 
 ## Core Capabilities
 
 *   **Zero-Copy Architecture**
-    Implements a streaming I/O model that serializes data directly from application memory to disk, eliminating redundant data replication and intermediate buffering.
+    Streams contiguous little-endian data directly from application memory to disk in the uncompressed path. For non-contiguous views and layout adapters, MicroVTK materializes only the bytes needed by the VTK output layout.
     > **⚠️ Lifetime Note:** The writer stores *views* to the provided data. The application must ensure the underlying data containers remain valid until the `.write()` method is called.
 
 *   **Format Support**
@@ -22,10 +22,10 @@ MicroVTK is a header-only C++20 library developed for high-performance computing
     Supports non-linear memory layouts, specifically Morton Codes (Z-Order curves) in two and three dimensions. It utilizes BMI2 hardware instructions (`PDEP`) for accelerated coordinate encoding when available.
 
 *   **Compression**
-    Integrates transparent support for ZLIB and LZ4 compression algorithms to mitigate I/O bandwidth limitations.
+    Integrates optional ZLIB and LZ4 compression. Compression necessarily produces a separate compressed byte stream, but contiguous input data can be passed to the compressor without first copying it into an intermediate raw buffer.
 
 *   **Reliability & Standards**
-    The core library maintains zero external dependencies. The codebase is rigorously validated via GoogleTest and verified for memory safety using Valgrind.
+    Keeps the uncompressed core header-only and dependency-light, with optional dependencies enabled for compression and HPC adapters. The codebase is validated with GoogleTest and integration-tested against the official VTK Python bindings.
 
 ---
 

@@ -5,7 +5,10 @@
 #include <functional>
 #include <iostream>
 #include <microvtk/core/binary_utils.hpp>
+#include <optional>
 #include <ranges>
+#include <span>
+#include <type_traits>
 #include <vector>
 
 namespace microvtk::core {
@@ -16,6 +19,8 @@ struct DataAccessor {
   virtual void write_to(
       std::vector<uint8_t>& buffer) const = 0;  // Legacy support (optional)
   virtual void write_to_stream(std::ostream& os) const = 0;
+  [[nodiscard]] virtual std::optional<std::span<const uint8_t>>
+  contiguous_bytes() const = 0;
   [[nodiscard]] virtual size_t size_bytes() const = 0;
 };
 
@@ -59,6 +64,21 @@ public:
         os.write(reinterpret_cast<const char*>(temp.data()),
                  static_cast<std::streamsize>(temp.size()));
       }
+    }
+  }
+
+  [[nodiscard]] std::optional<std::span<const uint8_t>> contiguous_bytes()
+      const override {
+    using T = std::ranges::range_value_t<R>;
+
+    if constexpr (std::ranges::contiguous_range<R> &&
+                  std::is_arithmetic_v<std::remove_const_t<T>> &&
+                  std::endian::native == std::endian::little) {
+      auto data_span = std::span{range_};
+      const auto* bytes = reinterpret_cast<const uint8_t*>(data_span.data());
+      return std::span<const uint8_t>{bytes, data_span.size_bytes()};
+    } else {
+      return std::nullopt;
     }
   }
 
