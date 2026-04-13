@@ -6,7 +6,7 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-# Ensure all targets are built with -fPIC (needed for Python bindings)
+# Ensure all targets are built with -fPIC.
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 # Options
@@ -17,7 +17,6 @@ option(MICROVTK_USE_ZLIB "Enable ZLib compression support" ON)
 option(MICROVTK_USE_LZ4 "Enable LZ4 compression support" ON)
 option(MICROVTK_USE_KOKKOS "Enable Kokkos adapter support" OFF)
 option(MICROVTK_USE_CABANA "Enable Cabana adapter support" OFF)
-option(MICROVTK_ENABLE_PYTHON "Enable Python bindings" OFF)
 
 # Default to ON if top-level project
 if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
@@ -170,32 +169,6 @@ endif()
 if(MICROVTK_USE_CABANA)
     target_compile_definitions(microvtk INTERFACE MICROVTK_HAS_CABANA)
     target_link_libraries(microvtk INTERFACE Cabana::cabanacore)
-endif()
-
-# Python Bindings
-if(MICROVTK_ENABLE_PYTHON)
-    # Find Python first to ensure nanobind can find it
-    find_package(Python REQUIRED COMPONENTS Interpreter Development.Module)
-
-    # Check if nanobind target is already available (Monorepo via FetchContent)
-    if(TARGET nanobind::nanobind-static OR TARGET nanobind)
-        message(STATUS "MicroVTK: Using existing nanobind target.")
-    # Otherwise check external submodule (Standalone)
-    elseif(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/external/nanobind/CMakeLists.txt")
-        message(STATUS "MicroVTK: Using nanobind from external/ submodule.")
-        add_subdirectory(external/nanobind EXCLUDE_FROM_ALL)
-    else()
-        message(STATUS "MicroVTK: nanobind not found in external/, using FetchContent.")
-        include(FetchContent)
-        FetchContent_Declare(
-          nanobind
-          GIT_REPOSITORY https://github.com/wjakob/nanobind.git
-          GIT_TAG        v2.4.0
-        )
-        FetchContent_MakeAvailable(nanobind)
-    endif()
-
-    add_subdirectory(python)
 endif()
 
 # Helper for strict warnings (only applied to internal targets)
