@@ -48,8 +48,9 @@ TEST(Adapter, AdaptedRangeCanBeTransformed) {
   std::vector<Particle> particles = {{.mass = 1.0, .id = 10},
                                      {.mass = 2.0, .id = 20}};
 
-  auto doubled_masses = adapt(particles, &Particle::mass) |
-                        std::views::transform([](double mass) { return 2.0 * mass; });
+  auto doubled_masses =
+      adapt(particles, &Particle::mass) |
+      std::views::transform([](double mass) { return 2.0 * mass; });
 
   static_assert(std::ranges::view<decltype(doubled_masses)>);
   auto it = doubled_masses.begin();

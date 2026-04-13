@@ -160,11 +160,10 @@ private:
     }
   }
 
-  void prepareCompression(
-      const std::vector<DataBlockInfo*>& orderedBlocks,
-      const std::unique_ptr<Compressor>& compressor,
-      std::vector<std::vector<uint8_t>>& compressedBuffers,
-      std::vector<uint64_t>& originalSizes) {
+  void prepareCompression(const std::vector<DataBlockInfo*>& orderedBlocks,
+                          const std::unique_ptr<Compressor>& compressor,
+                          std::vector<std::vector<uint8_t>>& compressedBuffers,
+                          std::vector<uint64_t>& originalSizes) {
     uint64_t runningOffset = 0;
 
     for (auto* block : orderedBlocks) {

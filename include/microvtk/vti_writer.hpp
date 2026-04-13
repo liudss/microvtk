@@ -92,14 +92,16 @@ private:
     const auto expectedCellElements = cellCount();
 
     for (const auto& block : pointDataBlocks_) {
-      if (block.numberOfElements != expectedPointElements * block.numComponents) {
+      if (block.numberOfElements !=
+          expectedPointElements * block.numComponents) {
         throw std::invalid_argument(
             "VtiWriter::write: Size mismatch in PointData '" + block.name +
             "'.");
       }
     }
     for (const auto& block : cellDataBlocks_) {
-      if (block.numberOfElements != expectedCellElements * block.numComponents) {
+      if (block.numberOfElements !=
+          expectedCellElements * block.numComponents) {
         throw std::invalid_argument(
             "VtiWriter::write: Size mismatch in CellData '" + block.name +
             "'.");

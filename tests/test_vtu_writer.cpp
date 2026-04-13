@@ -108,8 +108,7 @@ TEST(VtuWriter, UncompressedAppendedDataUsesLogicalOrder) {
   std::vector<float> pointData = {1.1F, 2.2F, 3.3F};
   writer.addPointData("ScalarField", pointData);
 
-  std::vector<double> points = {0.0, 0.0, 0.0, 1.0, 0.0,
-                                0.0, 0.0, 1.0, 0.0};
+  std::vector<double> points = {0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0};
   writer.setPoints(points);
 
   std::vector<int32_t> conn = {0, 1, 2};
