@@ -10,6 +10,7 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <type_traits>
 #include <vector>
 
 namespace microvtk {
@@ -28,6 +29,10 @@ public:
     if (inputDim < 1 || inputDim > 3) {
       throw std::invalid_argument(
           "VtuWriter::setPoints: inputDim must be 1, 2, or 3.");
+    }
+    if (std::ranges::size(points) % static_cast<size_t>(inputDim) != 0) {
+      throw std::invalid_argument(
+          "VtuWriter::setPoints: points size must be divisible by inputDim.");
     }
 
     if (inputDim == 3) {
@@ -66,6 +71,7 @@ public:
       throw std::invalid_argument(
           "VtuWriter::setCells: Size mismatch between offsets and types.");
     }
+    validateCellTopology(connectivity, offsets);
     numberOfCells_ = std::ranges::size(types);
 
     cellsConnBlock_ = registerData(connectivity, "connectivity", 1);
@@ -112,14 +118,69 @@ public:
         prepareAppendedData(orderedBlocks, compressedBuffers, originalSizes);
 
     std::ofstream ofs(std::string(filename), std::ios::binary);
+    if (!ofs.is_open()) {
+      throw std::runtime_error("VtuWriter::write: Failed to open output file '" +
+                               std::string(filename) + "'.");
+    }
     writeXmlStructure(ofs, usingCompression);
     writeAppendedData(ofs, orderedBlocks, usingCompression, compressedBuffers,
                       originalSizes);
 
     ofs << "</VTKFile>";
+    if (!ofs) {
+      throw std::runtime_error("VtuWriter::write: Failed while writing '" +
+                               std::string(filename) + "'.");
+    }
   }
 
 private:
+  template <std::ranges::range R1, std::ranges::range R2>
+  void validateCellTopology(const R1& connectivity, const R2& offsets) const {
+    size_t previous = 0;
+    size_t offsetCount = 0;
+    for (const auto& offsetValue : offsets) {
+      using OffsetType = std::remove_cvref_t<decltype(offsetValue)>;
+      if constexpr (std::is_signed_v<OffsetType>) {
+        if (offsetValue < 0) {
+          throw std::invalid_argument(
+              "VtuWriter::setCells: offsets must be non-negative.");
+        }
+      }
+
+      const auto offset = static_cast<size_t>(offsetValue);
+      if (offset <= previous) {
+        throw std::invalid_argument(
+            "VtuWriter::setCells: offsets must be strictly increasing.");
+      }
+      previous = offset;
+      ++offsetCount;
+    }
+
+    if (offsetCount > 0 && previous != std::ranges::size(connectivity)) {
+      throw std::invalid_argument(
+          "VtuWriter::setCells: final offset must match connectivity size.");
+    }
+    if (offsetCount == 0 && std::ranges::size(connectivity) != 0) {
+      throw std::invalid_argument(
+          "VtuWriter::setCells: offsets required for non-empty connectivity.");
+    }
+
+    for (const auto& indexValue : connectivity) {
+      using IndexType = std::remove_cvref_t<decltype(indexValue)>;
+      if constexpr (std::is_signed_v<IndexType>) {
+        if (indexValue < 0) {
+          throw std::invalid_argument(
+              "VtuWriter::setCells: connectivity index out of range.");
+        }
+      }
+
+      if (static_cast<size_t>(indexValue) >= numberOfPoints_) {
+        throw std::invalid_argument(
+            "VtuWriter::setCells: connectivity index out of range.");
+      }
+    }
+  }
+
   std::vector<DataBlockInfo*> dataBlocksInWriteOrder() {
     std::vector<DataBlockInfo*> blocks = {&pointsBlock_, &cellsConnBlock_,
                                           &cellsOffsetsBlock_,

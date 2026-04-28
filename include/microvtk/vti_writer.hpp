@@ -52,11 +52,19 @@ public:
         prepareAppendedData(orderedBlocks, compressedBuffers, originalSizes);
 
     std::ofstream ofs(std::string(filename), std::ios::binary);
+    if (!ofs.is_open()) {
+      throw std::runtime_error("VtiWriter::write: Failed to open output file '" +
+                               std::string(filename) + "'.");
+    }
     writeXmlStructure(ofs, usingCompression);
     writeAppendedData(ofs, orderedBlocks, usingCompression, compressedBuffers,
                       originalSizes);
 
     ofs << "</VTKFile>";
+    if (!ofs) {
+      throw std::runtime_error("VtiWriter::write: Failed while writing '" +
+                               std::string(filename) + "'.");
+    }
   }
 
 private:

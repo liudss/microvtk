@@ -2,6 +2,7 @@
 #include <fstream>
 #include <gtest/gtest.h>
 #include <microvtk/pvd_writer.hpp>
+#include <stdexcept>
 
 using namespace microvtk;
 
@@ -29,4 +30,15 @@ TEST(PvdWriter, WriteSteps) {
 
   // Cleanup
   // std::filesystem::remove(filename);
+}
+
+TEST(PvdWriter, ThrowsWhenOutputCannotBeOpened) {
+  const std::filesystem::path dir = "pvd_writer_output_directory";
+  std::filesystem::create_directory(dir);
+
+  PvdWriter writer(dir.string());
+  writer.addStep(0.0, "step_0.vtu");
+  EXPECT_THROW(writer.save(), std::runtime_error);
+
+  std::filesystem::remove(dir);
 }

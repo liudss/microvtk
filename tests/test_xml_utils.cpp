@@ -41,3 +41,18 @@ TEST(XmlUtils, ScopedElement) {
   EXPECT_TRUE(output.find("<Child val=\"3.14\"/>") != std::string::npos);
   EXPECT_TRUE(output.find("</Root>") != std::string::npos);
 }
+
+TEST(XmlUtils, EscapesStringAttributes) {
+  std::stringstream ss;
+  {
+    XmlBuilder xml(ss);
+    xml.startElement("Root");
+    std::string value = "a&b<c>\"d'e";
+    xml.attribute("name", value);
+    xml.endElement();
+  }
+
+  std::string output = ss.str();
+  EXPECT_TRUE(output.find("name=\"a&amp;b&lt;c&gt;&quot;d&apos;e\"") !=
+              std::string::npos);
+}

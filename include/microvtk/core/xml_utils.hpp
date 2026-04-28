@@ -5,6 +5,7 @@
 #include <iostream>
 #include <string>
 #include <string_view>
+#include <type_traits>
 #include <vector>
 
 namespace microvtk::core {
@@ -36,8 +37,17 @@ public:
     os_ << std::format(" {}=\"{}\"", name, escapeXml(value));
   }
 
+  void attribute(std::string_view name, const std::string& value) {
+    attribute(name, std::string_view(value));
+  }
+
+  void attribute(std::string_view name, const char* value) {
+    attribute(name, std::string_view(value));
+  }
+
   // Adds an attribute with numeric value
   template <typename T>
+    requires(!std::is_convertible_v<T, std::string_view>)
   void attribute(std::string_view name, const T& value) {
     os_ << std::format(" {}=\"{}\"", name, value);
   }

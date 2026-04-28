@@ -2,6 +2,7 @@
 
 #include <fstream>
 #include <microvtk/core/xml_utils.hpp>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -24,6 +25,10 @@ public:
   /// Write the PVD file to disk.
   void save() {
     std::ofstream ofs(filename_);
+    if (!ofs.is_open()) {
+      throw std::runtime_error("PvdWriter::save: Failed to open output file '" +
+                               filename_ + "'.");
+    }
     core::XmlBuilder xml(ofs);
 
     xml.startElement("VTKFile");
@@ -45,6 +50,10 @@ public:
     }
 
     xml.endElement();  // Close VTKFile
+    if (!ofs) {
+      throw std::runtime_error("PvdWriter::save: Failed while writing '" +
+                               filename_ + "'.");
+    }
   }
 
 private:

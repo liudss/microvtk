@@ -147,3 +147,15 @@ TEST(VtiWriter, DataSizeMismatch) {
   writer2.addCellData("bad_cells", cellData);
   EXPECT_THROW(writer2.write("should_fail_cells.vti"), std::invalid_argument);
 }
+
+TEST(VtiWriter, ThrowsWhenOutputCannotBeOpened) {
+  std::array<int, 6> extent = {0, 0, 0, 0, 0, 0};
+  VtiWriter writer(extent);
+  std::vector<double> pointData = {1.0};
+  writer.addPointData("points", pointData);
+
+  const std::filesystem::path dir = "vti_writer_output_directory";
+  std::filesystem::create_directory(dir);
+  EXPECT_THROW(writer.write(dir.string()), std::runtime_error);
+  std::filesystem::remove(dir);
+}
