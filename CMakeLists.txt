@@ -9,127 +9,187 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 # Ensure all targets are built with -fPIC.
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
+if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
+    set(MICROVTK_IS_TOP_LEVEL ON)
+else()
+    set(MICROVTK_IS_TOP_LEVEL OFF)
+endif()
+
 # Options
-option(MICROVTK_BUILD_TESTS "Build unit tests" OFF)
-option(MICROVTK_BUILD_EXAMPLES "Build examples" OFF)
-option(MICROVTK_BUILD_BENCHMARKS "Build benchmarks" OFF)
+option(MICROVTK_BUILD_TESTS "Build unit tests" ${MICROVTK_IS_TOP_LEVEL})
+option(MICROVTK_BUILD_EXAMPLES "Build examples" ${MICROVTK_IS_TOP_LEVEL})
+option(MICROVTK_BUILD_BENCHMARKS "Build benchmarks" ${MICROVTK_IS_TOP_LEVEL})
 option(MICROVTK_USE_ZLIB "Enable ZLib compression support" ON)
 option(MICROVTK_USE_LZ4 "Enable LZ4 compression support" ON)
 option(MICROVTK_USE_KOKKOS "Enable Kokkos adapter support" OFF)
 option(MICROVTK_USE_CABANA "Enable Cabana adapter support" OFF)
 
-# Default to ON if top-level project
-if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
-    set(MICROVTK_BUILD_TESTS ON CACHE BOOL "Build unit tests" FORCE)
-    set(MICROVTK_BUILD_EXAMPLES ON CACHE BOOL "Build examples" FORCE)
-    set(MICROVTK_BUILD_BENCHMARKS ON CACHE BOOL "Build benchmarks" FORCE)
-endif()
+set(MICROVTK_USE_CPM_DEFAULT ${MICROVTK_IS_TOP_LEVEL})
+option(MICROVTK_USE_CPM "Allow CPM.cmake fallback for dependencies that find_package cannot resolve" ${MICROVTK_USE_CPM_DEFAULT})
 
 # Dependencies
-if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
-    # -------------------------------------------------------------------------
-    # Development / Standalone Build: Try Submodules, then FetchContent
-    # -------------------------------------------------------------------------
-    message(STATUS "MicroVTK: Building in standalone mode.")
-    include(FetchContent)
+function(microvtk_include_cpm)
+    if(COMMAND CPMAddPackage)
+        return()
+    endif()
 
-    # ZLIB
-    if(MICROVTK_USE_ZLIB)
-        if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/external/zlib/CMakeLists.txt")
-            set(ZLIB_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
-            set(ZLIB_BUILD_TESTING OFF CACHE BOOL "" FORCE)
-            set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
-            set(ZLIB_BUILD_SHARED OFF CACHE BOOL "" FORCE)
-            set(ZLIB_BUILD_STATIC ON CACHE BOOL "" FORCE)
-            add_subdirectory(external/zlib)
-        else()
-            message(STATUS "MicroVTK: zlib submodule not found, using FetchContent.")
-            FetchContent_Declare(zlib GIT_REPOSITORY https://github.com/madler/zlib.git GIT_TAG v1.3.1)
-            set(ZLIB_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
-            FetchContent_MakeAvailable(zlib)
-        endif()
+    set(CPM_DOWNLOAD_VERSION 0.40.8)
+    set(CPM_DOWNLOAD_LOCATION "${CMAKE_BINARY_DIR}/cmake/CPM_${CPM_DOWNLOAD_VERSION}.cmake")
 
-        if(NOT TARGET ZLIB::ZLIB)
-            if(TARGET zlibstatic)
-                 add_library(ZLIB::ZLIB ALIAS zlibstatic)
-            elseif(TARGET zlib)
-                 add_library(ZLIB::ZLIB ALIAS zlib)
-            endif()
+    if(NOT EXISTS "${CPM_DOWNLOAD_LOCATION}")
+        message(STATUS "MicroVTK: Downloading CPM.cmake ${CPM_DOWNLOAD_VERSION}")
+        file(DOWNLOAD
+            "https://github.com/cpm-cmake/CPM.cmake/releases/download/v${CPM_DOWNLOAD_VERSION}/CPM.cmake"
+            "${CPM_DOWNLOAD_LOCATION}"
+            STATUS CPM_DOWNLOAD_STATUS
+            TLS_VERIFY ON
+        )
+        list(GET CPM_DOWNLOAD_STATUS 0 CPM_DOWNLOAD_RESULT)
+        if(NOT CPM_DOWNLOAD_RESULT EQUAL 0)
+            list(GET CPM_DOWNLOAD_STATUS 1 CPM_DOWNLOAD_ERROR)
+            message(FATAL_ERROR "MicroVTK: Failed to download CPM.cmake: ${CPM_DOWNLOAD_ERROR}")
         endif()
     endif()
 
-    # LZ4
-    if(MICROVTK_USE_LZ4)
-        if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/external/lz4/build/cmake/CMakeLists.txt")
-            set(LZ4_BUILD_CLI OFF CACHE BOOL "" FORCE)
-            set(LZ4_BUILD_LEGACY_LZ4C OFF CACHE BOOL "" FORCE)
-            add_subdirectory(external/lz4/build/cmake)
-        else()
-            message(STATUS "MicroVTK: lz4 submodule not found, using FetchContent.")
-            FetchContent_Declare(lz4 GIT_REPOSITORY https://github.com/lz4/lz4.git SOURCE_SUBDIR build/cmake GIT_TAG v1.10.0)
-            set(LZ4_BUILD_CLI OFF CACHE BOOL "" FORCE)
-            set(LZ4_BUILD_LEGACY_LZ4C OFF CACHE BOOL "" FORCE)
-            FetchContent_MakeAvailable(lz4)
+    include("${CPM_DOWNLOAD_LOCATION}")
+endfunction()
+
+function(microvtk_require_dependency package_name)
+    if(NOT MICROVTK_USE_CPM)
+        message(FATAL_ERROR
+            "MicroVTK: ${package_name} was not found. Install it or configure with "
+            "-DMICROVTK_USE_CPM=ON to allow the development fallback."
+        )
+    endif()
+endfunction()
+
+function(microvtk_resolve_zlib)
+    if(TARGET ZLIB::ZLIB)
+        return()
+    endif()
+
+    find_package(ZLIB QUIET)
+    if(TARGET ZLIB::ZLIB)
+        return()
+    endif()
+
+    microvtk_require_dependency(ZLIB)
+    microvtk_include_cpm()
+    message(STATUS "MicroVTK: ZLIB not found; using CPM.cmake fallback.")
+    CPMAddPackage(
+        NAME zlib
+        GITHUB_REPOSITORY madler/zlib
+        GIT_TAG v1.3.1
+        OPTIONS
+            "ZLIB_BUILD_EXAMPLES OFF"
+            "ZLIB_BUILD_TESTING OFF"
+            "ZLIB_BUILD_SHARED OFF"
+            "ZLIB_BUILD_STATIC ON"
+    )
+
+    if(NOT TARGET ZLIB::ZLIB)
+        if(TARGET zlibstatic)
+            add_library(ZLIB::ZLIB ALIAS zlibstatic)
+        elseif(TARGET zlib)
+            add_library(ZLIB::ZLIB ALIAS zlib)
+        endif()
+    endif()
+endfunction()
+
+function(microvtk_resolve_lz4)
+    if(TARGET lz4::lz4 OR TARGET lz4_static OR TARGET PkgConfig::LZ4)
+        return()
+    endif()
+
+    find_package(lz4 CONFIG QUIET)
+    if(TARGET lz4::lz4 OR TARGET lz4_static)
+        return()
+    endif()
+
+    find_package(PkgConfig QUIET)
+    if(PkgConfig_FOUND)
+        pkg_check_modules(LZ4 QUIET IMPORTED_TARGET liblz4)
+        if(TARGET PkgConfig::LZ4)
+            return()
         endif()
     endif()
 
-    # Kokkos
-    if(MICROVTK_USE_KOKKOS)
-        if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/external/kokkos/CMakeLists.txt")
-            set(Kokkos_ENABLE_TESTS OFF CACHE BOOL "" FORCE)
-            set(Kokkos_ENABLE_EXAMPLES OFF CACHE BOOL "" FORCE)
-            set(Kokkos_ENABLE_IMPL_VIEW_LEGACY ON CACHE BOOL "" FORCE)
-            add_subdirectory(external/kokkos)
-        else()
-            message(STATUS "MicroVTK: Kokkos submodule not found, using FetchContent.")
-            FetchContent_Declare(kokkos GIT_REPOSITORY https://github.com/kokkos/kokkos.git GIT_TAG 4.4.01)
-            set(Kokkos_ENABLE_TESTS OFF CACHE BOOL "" FORCE)
-            set(Kokkos_ENABLE_EXAMPLES OFF CACHE BOOL "" FORCE)
-            set(Kokkos_ENABLE_IMPL_VIEW_LEGACY ON CACHE BOOL "" FORCE)
-            FetchContent_MakeAvailable(kokkos)
-        endif()
+    microvtk_require_dependency(LZ4)
+    microvtk_include_cpm()
+    message(STATUS "MicroVTK: LZ4 not found; using CPM.cmake fallback.")
+    CPMAddPackage(
+        NAME lz4
+        GITHUB_REPOSITORY lz4/lz4
+        GIT_TAG v1.10.0
+        SOURCE_SUBDIR build/cmake
+        OPTIONS
+            "LZ4_BUILD_CLI OFF"
+            "LZ4_BUILD_LEGACY_LZ4C OFF"
+    )
+endfunction()
+
+function(microvtk_resolve_kokkos)
+    if(TARGET Kokkos::kokkos)
+        return()
     endif()
 
-    # Cabana
-    if(MICROVTK_USE_CABANA)
-        if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/external/cabana/CMakeLists.txt")
-            set(Cabana_ENABLE_TESTING OFF CACHE BOOL "" FORCE)
-            set(Cabana_ENABLE_EXAMPLES OFF CACHE BOOL "" FORCE)
-            list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
-            add_subdirectory(external/cabana)
-        else()
-            message(STATUS "MicroVTK: Cabana submodule not found, using FetchContent.")
-            FetchContent_Declare(cabana GIT_REPOSITORY https://github.com/ECP-copa/Cabana.git GIT_TAG v0.6.0)
-            set(Cabana_ENABLE_TESTING OFF CACHE BOOL "" FORCE)
-            set(Cabana_ENABLE_EXAMPLES OFF CACHE BOOL "" FORCE)
-            FetchContent_MakeAvailable(cabana)
-        endif()
+    find_package(Kokkos QUIET)
+    if(TARGET Kokkos::kokkos)
+        return()
     endif()
 
-else()
-    # -------------------------------------------------------------------------
-    # Library Usage Mode: Use System/User Provided Dependencies
-    # -------------------------------------------------------------------------
-    if(MICROVTK_USE_ZLIB AND NOT TARGET ZLIB::ZLIB)
-        find_package(ZLIB REQUIRED)
+    microvtk_require_dependency(Kokkos)
+    microvtk_include_cpm()
+    message(STATUS "MicroVTK: Kokkos not found; using CPM.cmake fallback.")
+    CPMAddPackage(
+        NAME kokkos
+        GITHUB_REPOSITORY kokkos/kokkos
+        GIT_TAG 4.4.01
+        OPTIONS
+            "Kokkos_ENABLE_TESTS OFF"
+            "Kokkos_ENABLE_EXAMPLES OFF"
+            "Kokkos_ENABLE_IMPL_VIEW_LEGACY ON"
+    )
+endfunction()
+
+function(microvtk_resolve_cabana)
+    if(TARGET Cabana::cabanacore)
+        return()
     endif()
 
-    if(MICROVTK_USE_LZ4 AND NOT TARGET lz4::lz4 AND NOT TARGET lz4_static)
-        # Try finding LZ4 via Config mode first, then PkgConfig
-        find_package(lz4 CONFIG)
-        if(NOT lz4_FOUND)
-            find_package(PkgConfig REQUIRED)
-            pkg_check_modules(LZ4 REQUIRED liblz4)
-        endif()
+    find_package(Cabana QUIET)
+    if(TARGET Cabana::cabanacore)
+        return()
     endif()
 
-    if(MICROVTK_USE_KOKKOS AND NOT TARGET Kokkos::kokkos)
-        find_package(Kokkos REQUIRED)
-    endif()
+    microvtk_require_dependency(Cabana)
+    microvtk_include_cpm()
+    message(STATUS "MicroVTK: Cabana not found; using CPM.cmake fallback.")
+    list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+    CPMAddPackage(
+        NAME cabana
+        GITHUB_REPOSITORY ECP-copa/Cabana
+        GIT_TAG v0.6.0
+        OPTIONS
+            "Cabana_ENABLE_TESTING OFF"
+            "Cabana_ENABLE_EXAMPLES OFF"
+    )
+endfunction()
 
-    if(MICROVTK_USE_CABANA AND NOT TARGET Cabana::cabanacore)
-        find_package(Cabana REQUIRED)
-    endif()
+if(MICROVTK_USE_ZLIB)
+    microvtk_resolve_zlib()
+endif()
+
+if(MICROVTK_USE_LZ4)
+    microvtk_resolve_lz4()
+endif()
+
+if(MICROVTK_USE_KOKKOS)
+    microvtk_resolve_kokkos()
+endif()
+
+if(MICROVTK_USE_CABANA)
+    microvtk_resolve_cabana()
 endif()
 
 # Main Library (Header-Only)
@@ -184,13 +244,29 @@ endfunction()
 if(MICROVTK_BUILD_TESTS)
     enable_testing()
 
-    # Check if GTest is already available (e.g. from parent)
     if(NOT TARGET GTest::gtest)
-        set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
-        if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/external/googletest/CMakeLists.txt")
-            add_subdirectory(external/googletest)
+        find_package(GTest QUIET)
+        if(NOT TARGET GTest::gtest AND MICROVTK_USE_CPM)
+            microvtk_include_cpm()
+            message(STATUS "MicroVTK: GTest not found; using CPM.cmake fallback.")
+            CPMAddPackage(
+                NAME googletest
+                GITHUB_REPOSITORY google/googletest
+                GIT_TAG v1.15.2
+                OPTIONS
+                    "INSTALL_GTEST OFF"
+            )
+        elseif(NOT TARGET GTest::gtest)
+            message(WARNING "GTest not found and CPM fallback is disabled. Skipping tests.")
+            set(MICROVTK_BUILD_TESTS OFF)
+        endif()
+    endif()
+
+    if(TARGET GTest::gtest AND NOT TARGET GTest::gtest_main)
+        if(TARGET GTest::Main)
+            add_library(GTest::gtest_main ALIAS GTest::Main)
         else()
-            message(WARNING "GTest submodule not found. Skipping tests.")
+            message(WARNING "GTest main target not found. Skipping tests.")
             set(MICROVTK_BUILD_TESTS OFF)
         endif()
     endif()
@@ -267,12 +343,20 @@ endif()
 # Benchmarks
 if(MICROVTK_BUILD_BENCHMARKS)
     if(NOT TARGET benchmark::benchmark)
-        set(BENCHMARK_ENABLE_TESTING OFF CACHE BOOL "" FORCE)
-        set(BENCHMARK_ENABLE_INSTALL OFF CACHE BOOL "" FORCE)
-        if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/external/benchmark/CMakeLists.txt")
-            add_subdirectory(external/benchmark)
-        else()
-            message(WARNING "Benchmark submodule not found. Skipping benchmarks.")
+        find_package(benchmark CONFIG QUIET)
+        if(NOT TARGET benchmark::benchmark AND MICROVTK_USE_CPM)
+            microvtk_include_cpm()
+            message(STATUS "MicroVTK: benchmark not found; using CPM.cmake fallback.")
+            CPMAddPackage(
+                NAME benchmark
+                GITHUB_REPOSITORY google/benchmark
+                GIT_TAG v1.9.0
+                OPTIONS
+                    "BENCHMARK_ENABLE_TESTING OFF"
+                    "BENCHMARK_ENABLE_INSTALL OFF"
+            )
+        elseif(NOT TARGET benchmark::benchmark)
+            message(WARNING "benchmark not found and CPM fallback is disabled. Skipping benchmarks.")
             set(MICROVTK_BUILD_BENCHMARKS OFF)
         endif()
     endif()
