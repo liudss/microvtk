@@ -3,11 +3,11 @@
 #include <algorithm>
 #include <array>
 #include <cstddef>
-#include <fstream>
 #include <microvtk/adapter.hpp>
 #include <microvtk/common/types.hpp>
 #include <microvtk/core/appended_data_writer.hpp>
 #include <microvtk/core/xml_utils.hpp>
+#include <ostream>
 #include <ranges>
 #include <stdexcept>
 #include <string>
@@ -44,28 +44,12 @@ public:
   // 3. Write to file
   void write(std::string_view filename) {
     validateDataSizes();
-
-    auto orderedBlocks = dataBlocksInWriteOrder();
-    std::vector<std::vector<uint8_t>> compressedBuffers;
-    std::vector<uint64_t> originalSizes;
-    const bool usingCompression =
-        prepareAppendedData(orderedBlocks, compressedBuffers, originalSizes);
-
-    std::ofstream ofs(std::string(filename), std::ios::binary);
-    if (!ofs.is_open()) {
-      throw std::runtime_error(
-          "VtiWriter::write: Failed to open output file '" +
-          std::string(filename) + "'.");
-    }
-    writeXmlStructure(ofs, usingCompression);
-    writeAppendedData(ofs, orderedBlocks, usingCompression, compressedBuffers,
-                      originalSizes);
-
-    ofs << "</VTKFile>";
-    if (!ofs) {
-      throw std::runtime_error("VtiWriter::write: Failed while writing '" +
-                               std::string(filename) + "'.");
-    }
+    writeAppendedFile(
+        filename, dataBlocksInWriteOrder(),
+        [this](std::ostream& ofs, bool usingCompression) {
+          writeXmlStructure(ofs, usingCompression);
+        },
+        "VtiWriter::write");
   }
 
 private:

@@ -11,9 +11,11 @@
 #include <microvtk/core/xml_utils.hpp>
 #include <ranges>
 #include <span>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <type_traits>
+#include <utility>
 #include <vector>
 
 namespace microvtk::core {
@@ -106,6 +108,35 @@ protected:
     xml.attribute("format", "appended");
     xml.attribute("offset", info.offset);
     xml.endElement();
+  }
+
+  template <typename WriteXmlStructure>
+  void writeAppendedFile(std::string_view filename,
+                         const std::vector<DataBlockInfo*>& orderedBlocks,
+                         WriteXmlStructure&& writeXmlStructure,
+                         std::string_view context) {
+    std::vector<std::vector<uint8_t>> compressedBuffers;
+    std::vector<uint64_t> originalSizes;
+    const bool usingCompression =
+        prepareAppendedData(orderedBlocks, compressedBuffers, originalSizes);
+
+    std::ofstream ofs(std::string(filename), std::ios::binary);
+    if (!ofs.is_open()) {
+      throw std::runtime_error(std::string(context) +
+                               ": Failed to open output file '" +
+                               std::string(filename) + "'.");
+    }
+
+    std::forward<WriteXmlStructure>(writeXmlStructure)(ofs, usingCompression);
+    writeAppendedData(ofs, orderedBlocks, usingCompression, compressedBuffers,
+                      originalSizes);
+
+    ofs << "</VTKFile>";
+    if (!ofs) {
+      throw std::runtime_error(std::string(context) +
+                               ": Failed while writing '" +
+                               std::string(filename) + "'.");
+    }
   }
 
   void writeAppendedData(
