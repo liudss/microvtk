@@ -6,6 +6,12 @@
 
 - Do not commit feature or fix work directly on `master`.
 - Do not push directly to remote `master`.
+- Enable the committed local pre-push hook once per clone:
+
+```bash
+rtk git config core.hooksPath .githooks
+```
+
 - Start every code change from the latest remote `master`:
 
 ```bash
