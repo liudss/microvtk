@@ -1,5 +1,3 @@
-@/home/liuzw/.codex/RTK.md
-
 # Development Collaboration Mode
 
 ## Branching
