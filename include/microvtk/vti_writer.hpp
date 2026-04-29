@@ -18,6 +18,8 @@ namespace microvtk {
 
 class VtiWriter : private core::AppendedDataWriter {
 public:
+  using core::AppendedDataWriter::addCellData;
+  using core::AppendedDataWriter::addPointData;
   using core::AppendedDataWriter::setCompression;
 
   // Constructor defining the grid geometry
@@ -26,20 +28,6 @@ public:
             const std::array<double, 3>& origin = {0.0, 0.0, 0.0},
             const std::array<double, 3>& spacing = {1.0, 1.0, 1.0})
       : wholeExtent_(wholeExtent), origin_(origin), spacing_(spacing) {}
-
-  // 1. Add Point Data (Attribute)
-  template <std::ranges::range R>
-  void addPointData(std::string_view name, const R& data,
-                    int numComponents = 1) {
-    pointDataBlocks_.push_back(registerData(data, name, numComponents));
-  }
-
-  // 2. Add Cell Data (Attribute)
-  template <std::ranges::range R>
-  void addCellData(std::string_view name, const R& data,
-                   int numComponents = 1) {
-    cellDataBlocks_.push_back(registerData(data, name, numComponents));
-  }
 
   // 3. Write to file
   void write(std::string_view filename) {
@@ -82,32 +70,13 @@ private:
   }
 
   void validateDataSizes() const {
-    const auto expectedPointElements = pointCount();
-    const auto expectedCellElements = cellCount();
-
-    for (const auto& block : pointDataBlocks_) {
-      if (block.numberOfElements !=
-          expectedPointElements * block.numComponents) {
-        throw std::invalid_argument(
-            "VtiWriter::write: Size mismatch in PointData '" + block.name +
-            "'.");
-      }
-    }
-    for (const auto& block : cellDataBlocks_) {
-      if (block.numberOfElements !=
-          expectedCellElements * block.numComponents) {
-        throw std::invalid_argument(
-            "VtiWriter::write: Size mismatch in CellData '" + block.name +
-            "'.");
-      }
-    }
+    validateAttributeDataSizes(pointCount(), cellCount(), "VtiWriter::write");
   }
 
   std::vector<DataBlockInfo*> dataBlocksInWriteOrder() {
     std::vector<DataBlockInfo*> blocks;
-    blocks.reserve(pointDataBlocks_.size() + cellDataBlocks_.size());
-    for (auto& block : pointDataBlocks_) blocks.push_back(&block);
-    for (auto& block : cellDataBlocks_) blocks.push_back(&block);
+    blocks.reserve(attributeBlockCount());
+    appendAttributeBlocks(blocks);
     return blocks;
   }
 
@@ -137,17 +106,8 @@ private:
         // For serial writing, Piece Extent is same as WholeExtent
         piece.attr("Extent", formatArray(wholeExtent_));
 
-        if (!pointDataBlocks_.empty()) {
-          auto pd = xml.scopedElement("PointData");
-          for (const auto& block : pointDataBlocks_)
-            writeDataArrayHeader(xml, block);
-        }
-
-        if (!cellDataBlocks_.empty()) {
-          auto cd = xml.scopedElement("CellData");
-          for (const auto& block : cellDataBlocks_)
-            writeDataArrayHeader(xml, block);
-        }
+        writePointDataHeaders(xml);
+        writeCellDataHeaders(xml);
       }
     }
 
@@ -159,9 +119,6 @@ private:
   std::array<int, 6> wholeExtent_;
   std::array<double, 3> origin_;
   std::array<double, 3> spacing_;
-
-  std::vector<DataBlockInfo> pointDataBlocks_;
-  std::vector<DataBlockInfo> cellDataBlocks_;
 };
 
 }  // namespace microvtk

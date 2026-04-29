@@ -18,6 +18,8 @@ namespace microvtk {
 
 class VtuWriter : private core::AppendedDataWriter {
 public:
+  using core::AppendedDataWriter::addCellData;
+  using core::AppendedDataWriter::addPointData;
   using core::AppendedDataWriter::setCompression;
 
   explicit VtuWriter(DataFormat /*format*/ = DataFormat::Appended) {}
@@ -80,20 +82,6 @@ public:
     cellsTypesBlock_ = registerData(types, "types", 1);
   }
 
-  // 3. Add Point Data (Attribute)
-  template <std::ranges::range R>
-  void addPointData(std::string_view name, const R& data,
-                    int numComponents = 1) {
-    pointDataBlocks_.push_back(registerData(data, name, numComponents));
-  }
-
-  // 4. Add Cell Data (Attribute)
-  template <std::ranges::range R>
-  void addCellData(std::string_view name, const R& data,
-                   int numComponents = 1) {
-    cellDataBlocks_.push_back(registerData(data, name, numComponents));
-  }
-
   // 5. Write to file
   void write(std::string_view filename) {
     validateDataSizes();
@@ -107,21 +95,8 @@ public:
 
 private:
   void validateDataSizes() const {
-    // Late validation of data sizes (snapshot check)
-    for (const auto& block : pointDataBlocks_) {
-      if (block.numberOfElements != numberOfPoints_ * block.numComponents) {
-        throw std::invalid_argument(
-            "VtuWriter::write: Size mismatch in PointData '" + block.name +
-            "'.");
-      }
-    }
-    for (const auto& block : cellDataBlocks_) {
-      if (block.numberOfElements != numberOfCells_ * block.numComponents) {
-        throw std::invalid_argument(
-            "VtuWriter::write: Size mismatch in CellData '" + block.name +
-            "'.");
-      }
-    }
+    validateAttributeDataSizes(numberOfPoints_, numberOfCells_,
+                               "VtuWriter::write");
   }
 
   template <std::ranges::range R1, std::ranges::range R2>
@@ -175,8 +150,7 @@ private:
     std::vector<DataBlockInfo*> blocks = {&pointsBlock_, &cellsConnBlock_,
                                           &cellsOffsetsBlock_,
                                           &cellsTypesBlock_};
-    for (auto& block : pointDataBlocks_) blocks.push_back(&block);
-    for (auto& block : cellDataBlocks_) blocks.push_back(&block);
+    appendAttributeBlocks(blocks);
     return blocks;
   }
 
@@ -203,17 +177,8 @@ private:
           writeDataArrayHeader(xml, cellsTypesBlock_);
         }
 
-        if (!pointDataBlocks_.empty()) {
-          auto pd = xml.scopedElement("PointData");
-          for (const auto& block : pointDataBlocks_)
-            writeDataArrayHeader(xml, block);
-        }
-
-        if (!cellDataBlocks_.empty()) {
-          auto cd = xml.scopedElement("CellData");
-          for (const auto& block : cellDataBlocks_)
-            writeDataArrayHeader(xml, block);
-        }
+        writePointDataHeaders(xml);
+        writeCellDataHeaders(xml);
       }
     }
 
@@ -229,9 +194,6 @@ private:
   DataBlockInfo cellsConnBlock_;
   DataBlockInfo cellsOffsetsBlock_;
   DataBlockInfo cellsTypesBlock_;
-
-  std::vector<DataBlockInfo> pointDataBlocks_;
-  std::vector<DataBlockInfo> cellDataBlocks_;
 };
 
 }  // namespace microvtk
