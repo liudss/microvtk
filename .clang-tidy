@@ -5,13 +5,14 @@ Checks: 'bugprone-*,
          modernize-*,
          performance-*,
          readability-*,
+         -clang-diagnostic-pragma-once-outside-header,
          -readability-identifier-length,
          -modernize-use-trailing-return-type,
          -readability-braces-around-statements,
          -readability-magic-numbers,
          -readability-named-parameter,
          -bugprone-easily-swappable-parameters'
-WarningsAsErrors: ''
+WarningsAsErrors: '*'
 HeaderFilterRegex: 'include/microvtk/.*'
 FormatStyle: file
 CheckOptions:
