@@ -53,8 +53,9 @@ public:
 
     std::ofstream ofs(std::string(filename), std::ios::binary);
     if (!ofs.is_open()) {
-      throw std::runtime_error("VtiWriter::write: Failed to open output file '" +
-                               std::string(filename) + "'.");
+      throw std::runtime_error(
+          "VtiWriter::write: Failed to open output file '" +
+          std::string(filename) + "'.");
     }
     writeXmlStructure(ofs, usingCompression);
     writeAppendedData(ofs, orderedBlocks, usingCompression, compressedBuffers,
@@ -72,7 +73,7 @@ private:
     size_t count = 1;
     for (size_t axis = 0; axis < 3; ++axis) {
       const int min = wholeExtent_[axis * 2];
-      const int max = wholeExtent_[axis * 2 + 1];
+      const int max = wholeExtent_[(axis * 2) + 1];
       if (max < min) {
         throw std::invalid_argument("VtiWriter: invalid extent.");
       }
@@ -85,11 +86,12 @@ private:
     size_t count = 1;
     for (size_t axis = 0; axis < 3; ++axis) {
       const int min = wholeExtent_[axis * 2];
-      const int max = wholeExtent_[axis * 2 + 1];
+      const int max = wholeExtent_[(axis * 2) + 1];
       if (max < min) {
         throw std::invalid_argument("VtiWriter: invalid extent.");
       }
-      const auto pointCount = static_cast<size_t>(max - min + 1);
+      const auto pointCount =
+          (static_cast<size_t>(max) - static_cast<size_t>(min)) + 1;
       count *= std::max<size_t>(pointCount - 1, 1);
     }
     return count;

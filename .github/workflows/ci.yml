@@ -6,7 +6,56 @@ on:
   pull_request:
     branches: [ main, master ]
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
+  clang-tidy:
+    name: Clang-Tidy
+    runs-on: ubuntu-24.04
+    env:
+      CC: clang
+      CXX: clang++
+      CPM_SOURCE_CACHE: ${{ github.workspace }}/.cpm-cache
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    - name: Restore dependency caches
+      uses: actions/cache@v4
+      with:
+        path: |
+          ${{ env.CPM_SOURCE_CACHE }}
+          ${{ env.CCACHE_DIR }}
+        key: ${{ runner.os }}-clang-tidy-${{ hashFiles('CMakeLists.txt', 'CMakePresets.json', 'uv.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-clang-tidy-
+
+    - name: Install Dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y clang clang-tidy ccache ninja-build
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v2
+      with:
+        enable-cache: true
+
+    - name: Configure CMake
+      run: |
+        cmake --preset clang-tidy \
+          -D CMAKE_CXX_COMPILER_LAUNCHER=ccache
+
+    - name: Run clang-tidy build
+      run: cmake --build --preset clang-tidy --target microvtk_ide_headers --parallel
+
+    - name: Show ccache stats
+      run: ccache --show-stats
+
   build-linux:
     name: Linux (${{ matrix.compiler }}, ${{ matrix.build_type }})
     runs-on: ubuntu-24.04
@@ -15,16 +64,31 @@ jobs:
       matrix:
         compiler: [gcc, clang]
         build_type: [debug, release]
+    env:
+      CPM_SOURCE_CACHE: ${{ github.workspace }}/.cpm-cache
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
 
     steps:
     - uses: actions/checkout@v4
       with:
         submodules: recursive
 
+    - name: Restore dependency caches
+      uses: actions/cache@v4
+      with:
+        path: |
+          ${{ env.CPM_SOURCE_CACHE }}
+          ${{ env.CCACHE_DIR }}
+        key: ${{ runner.os }}-${{ matrix.compiler }}-${{ matrix.build_type }}-${{ hashFiles('CMakeLists.txt', 'CMakePresets.json', 'uv.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-${{ matrix.compiler }}-${{ matrix.build_type }}-
+          ${{ runner.os }}-${{ matrix.compiler }}-
+          ${{ runner.os }}-
+
     - name: Install Dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y ninja-build valgrind
+        sudo apt-get install -y ccache ninja-build valgrind
 
     - name: Setup Compiler Environment
       run: |
@@ -42,15 +106,21 @@ jobs:
         enable-cache: true
 
     - name: Configure CMake
-      run: cmake --preset ${{ matrix.build_type }}
+      run: |
+        cmake --preset ${{ matrix.build_type }} \
+          -D CMAKE_CXX_COMPILER_LAUNCHER=ccache \
+          -D MICROVTK_BUILD_BENCHMARKS=OFF
 
     - name: Build
-      run: cmake --build --preset ${{ matrix.build_type }}
+      run: cmake --build --preset ${{ matrix.build_type }} --parallel
 
     - name: Test
-      run: ctest --test-dir build/${{ matrix.build_type }} --output-on-failure
+      run: ctest --test-dir build/${{ matrix.build_type }} --output-on-failure --parallel
       env:
         MICROVTK_USE_VALGRIND: ON
+
+    - name: Show ccache stats
+      run: ccache --show-stats
 
   build-windows:
     name: Windows (MSVC)
@@ -70,10 +140,10 @@ jobs:
         enable-cache: true
 
     - name: Configure CMake
-      run: cmake --preset msvc-debug
+      run: cmake --preset msvc-debug -D MICROVTK_BUILD_BENCHMARKS=OFF
 
     - name: Build
-      run: cmake --build --preset msvc-debug
+      run: cmake --build --preset msvc-debug --parallel
 
     - name: Test
-      run: ctest --preset msvc-tests
+      run: ctest --preset msvc-tests --parallel

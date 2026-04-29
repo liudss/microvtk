@@ -11,6 +11,7 @@
 #include <string>
 #include <string_view>
 #include <type_traits>
+#include <utility>
 #include <vector>
 
 namespace microvtk {
@@ -50,10 +51,10 @@ public:
           std::views::transform([view, inputDim](size_t i) -> double {
             size_t ptIdx = i / 3;
             size_t compIdx = i % 3;
-            if (compIdx < static_cast<size_t>(inputDim)) {
+            if (std::cmp_less(compIdx, inputDim)) {
               // Access the flattened input range
               return static_cast<double>(
-                  view[ptIdx * static_cast<size_t>(inputDim) + compIdx]);
+                  view[(ptIdx * static_cast<size_t>(inputDim)) + compIdx]);
             }
             return 0.0;
           });
@@ -119,8 +120,9 @@ public:
 
     std::ofstream ofs(std::string(filename), std::ios::binary);
     if (!ofs.is_open()) {
-      throw std::runtime_error("VtuWriter::write: Failed to open output file '" +
-                               std::string(filename) + "'.");
+      throw std::runtime_error(
+          "VtuWriter::write: Failed to open output file '" +
+          std::string(filename) + "'.");
     }
     writeXmlStructure(ofs, usingCompression);
     writeAppendedData(ofs, orderedBlocks, usingCompression, compressedBuffers,

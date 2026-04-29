@@ -5,10 +5,30 @@ repos:
       - id: trailing-whitespace
       - id: end-of-file-fixer
       - id: check-yaml
+      - id: check-toml
       - id: check-added-large-files
+      - id: pretty-format-json
+        args: [--autofix, --indent=2]
+        exclude: ^external/
 
   - repo: https://github.com/pre-commit/mirrors-clang-format
     rev: v17.0.6
     hooks:
       - id: clang-format
         exclude: ^external/|.*\.json$
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.11.8
+    hooks:
+      - id: ruff-format
+        files: ^tests/integration/.*\.py$
+
+  - repo: local
+    hooks:
+      - id: cmake-format
+        name: cmake-format
+        entry: cmake-format
+        language: python
+        additional_dependencies: [cmakelang==0.6.13]
+        files: ^(CMakeLists\.txt|cmake/.*\.cmake)$
+        exclude: ^external/

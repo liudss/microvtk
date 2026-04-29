@@ -8,6 +8,7 @@ import subprocess
 # Helper Functions
 # -----------------------------------------------------------------------------
 
+
 def find_executable(name):
     """Finds the build executable in likely locations."""
     # Possible build directories
@@ -23,7 +24,7 @@ def find_executable(name):
         "build_release/examples",
         "build_release/examples/Release",
         "build/msvc-debug",
-        "build/msvc-debug/Debug"
+        "build/msvc-debug/Debug",
     ]
 
     # Adjust for Windows
@@ -37,6 +38,7 @@ def find_executable(name):
             return path
 
     return None
+
 
 def run_example(name, output_files):
     """
@@ -52,9 +54,9 @@ def run_example(name, output_files):
     if os.environ.get("MICROVTK_USE_VALGRIND") == "ON":
         valgrind_exe = shutil.which("valgrind")
         if valgrind_exe:
-             # --error-exitcode=1 ensures Valgrind errors fail the test
-             # --leak-check=full gives detailed memory leak info
-             cmd = [valgrind_exe, "--leak-check=full", "--error-exitcode=1", exe]
+            # --error-exitcode=1 ensures Valgrind errors fail the test
+            # --leak-check=full gives detailed memory leak info
+            cmd = [valgrind_exe, "--leak-check=full", "--error-exitcode=1", exe]
 
     result = subprocess.run(cmd, capture_output=True, text=True)
     assert result.returncode == 0, f"{name} failed: {result.stderr}"
@@ -64,9 +66,11 @@ def run_example(name, output_files):
 
     return output_files
 
+
 # -----------------------------------------------------------------------------
 # Fixtures
 # -----------------------------------------------------------------------------
+
 
 @pytest.fixture(scope="module")
 def basic_vtu_file():
@@ -74,7 +78,9 @@ def basic_vtu_file():
     output = "example.vtu"
     run_example("example_basic", [output])
     yield output
-    if os.path.exists(output): os.remove(output)
+    if os.path.exists(output):
+        os.remove(output)
+
 
 @pytest.fixture(scope="module")
 def pvd_files():
@@ -86,10 +92,13 @@ def pvd_files():
     yield output
 
     # Cleanup
-    if os.path.exists(output): os.remove(output)
+    if os.path.exists(output):
+        os.remove(output)
     for i in range(10):
         f = f"wave_{i}.vtu"
-        if os.path.exists(f): os.remove(f)
+        if os.path.exists(f):
+            os.remove(f)
+
 
 @pytest.fixture(scope="module")
 def complex_vtu_file():
@@ -97,7 +106,9 @@ def complex_vtu_file():
     output = "complex_grid.vtu"
     run_example("example_complex_grid", [output])
     yield output
-    if os.path.exists(output): os.remove(output)
+    if os.path.exists(output):
+        os.remove(output)
+
 
 @pytest.fixture(scope="module")
 def compressed_vtu_file():
@@ -105,7 +116,9 @@ def compressed_vtu_file():
     output = "compressed.vtu"
     run_example("example_compression", [output])
     yield output
-    if os.path.exists(output): os.remove(output)
+    if os.path.exists(output):
+        os.remove(output)
+
 
 @pytest.fixture(scope="module")
 def hpc_vtu_file():
@@ -115,11 +128,15 @@ def hpc_vtu_file():
     # Special check for HPC since it's an optional build
     exe = find_executable("example_hpc")
     if not exe:
-        pytest.skip("example_hpc executable not found. Build with MICROVTK_USE_KOKKOS=ON.")
+        pytest.skip(
+            "example_hpc executable not found. Build with MICROVTK_USE_KOKKOS=ON."
+        )
 
     run_example("example_hpc", [output])
     yield output
-    if os.path.exists(output): os.remove(output)
+    if os.path.exists(output):
+        os.remove(output)
+
 
 @pytest.fixture(scope="module")
 def vti_adapt_file():
@@ -127,7 +144,9 @@ def vti_adapt_file():
     output = "vti_adapt.vti"
     run_example("example_vti_adapt", [output])
     yield output
-    if os.path.exists(output): os.remove(output)
+    if os.path.exists(output):
+        os.remove(output)
+
 
 @pytest.fixture(scope="module")
 def indexing_files():
@@ -136,4 +155,5 @@ def indexing_files():
     run_example("example_indexing", outputs)
     yield outputs
     for f in outputs:
-        if os.path.exists(f): os.remove(f)
+        if os.path.exists(f):
+            os.remove(f)

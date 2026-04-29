@@ -3,18 +3,19 @@
 #include <cstdint>
 #include <memory>
 #include <span>
+#include <stdexcept>
 #include <vector>
 
-#ifdef MICROVTK_HAS_ZLIB
+#if defined(MICROVTK_HAS_ZLIB) || defined(MICROVTK_HAS_LZ4)
 #include <limits>
-#include <stdexcept>
+#endif
+
+#ifdef MICROVTK_HAS_ZLIB
 #include <zlib.h>
 #endif
 
 #ifdef MICROVTK_HAS_LZ4
-#include <limits>
 #include <lz4.h>
-#include <stdexcept>
 #endif
 
 namespace microvtk::core {

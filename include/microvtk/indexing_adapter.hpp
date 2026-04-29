@@ -38,7 +38,7 @@ constexpr uint64_t split_by_2_generic(uint32_t a) noexcept {
   return x;
 }
 
-#if defined(__BMI2__)
+#ifdef __BMI2__
 // Hardware-accelerated splitting using PDEP
 inline uint64_t split_by_3_bmi2(uint32_t a) noexcept {
   // 0x1249... has bits 0, 3, 6... set
@@ -56,29 +56,20 @@ inline uint64_t split_by_2_bmi2(uint32_t a) noexcept {
 // -----------------------------------------------------------------------------
 
 inline uint64_t morton_encode_3d(uint32_t x, uint32_t y, uint32_t z) noexcept {
-#if defined(__BMI2__)
+#ifdef __BMI2__
   return split_by_3_bmi2(x) | (split_by_3_bmi2(y) << 1) |
          (split_by_3_bmi2(z) << 2);
 #else
-  if (std::is_constant_evaluated()) {
-    return split_by_3_generic(x) | (split_by_3_generic(y) << 1) |
-           (split_by_3_generic(z) << 2);
-  } else {
-    return split_by_3_generic(x) | (split_by_3_generic(y) << 1) |
-           (split_by_3_generic(z) << 2);
-  }
+  return split_by_3_generic(x) | (split_by_3_generic(y) << 1) |
+         (split_by_3_generic(z) << 2);
 #endif
 }
 
 inline uint64_t morton_encode_2d(uint32_t x, uint32_t y) noexcept {
-#if defined(__BMI2__)
+#ifdef __BMI2__
   return split_by_2_bmi2(x) | (split_by_2_bmi2(y) << 1);
 #else
-  if (std::is_constant_evaluated()) {
-    return split_by_2_generic(x) | (split_by_2_generic(y) << 1);
-  } else {
-    return split_by_2_generic(x) | (split_by_2_generic(y) << 1);
-  }
+  return split_by_2_generic(x) | (split_by_2_generic(y) << 1);
 #endif
 }
 

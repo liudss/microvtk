@@ -1,110 +1,127 @@
 {
-  "version": 3,
+  "buildPresets": [
+    {
+      "configurePreset": "debug",
+      "name": "debug"
+    },
+    {
+      "configurePreset": "release",
+      "name": "release"
+    },
+    {
+      "configurePreset": "coverage",
+      "name": "coverage"
+    },
+    {
+      "configurePreset": "clang-tidy",
+      "name": "clang-tidy"
+    },
+    {
+      "configurePreset": "msvc-debug",
+      "name": "msvc-debug"
+    }
+  ],
   "configurePresets": [
     {
-      "name": "base",
-      "hidden": true,
-      "generator": "Ninja",
       "binaryDir": "${sourceDir}/build/${presetName}",
       "cacheVariables": {
         "CMAKE_CXX_STANDARD": "20",
         "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
-        "MICROVTK_BUILD_TESTS": "ON",
-        "MICROVTK_BUILD_EXAMPLES": "ON",
         "MICROVTK_BUILD_BENCHMARKS": "ON",
-        "MICROVTK_USE_ZLIB": "ON",
-        "MICROVTK_USE_LZ4": "ON"
-      }
+        "MICROVTK_BUILD_EXAMPLES": "ON",
+        "MICROVTK_BUILD_TESTS": "ON",
+        "MICROVTK_USE_LZ4": "ON",
+        "MICROVTK_USE_ZLIB": "ON"
+      },
+      "generator": "Ninja",
+      "hidden": true,
+      "name": "base"
     },
     {
-      "name": "debug",
-      "displayName": "Debug (Ninja)",
-      "description": "Debug build with tests and examples enabled",
-      "inherits": "base",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug"
-      }
+      },
+      "description": "Debug build with tests and examples enabled",
+      "displayName": "Debug (Ninja)",
+      "inherits": "base",
+      "name": "debug"
     },
     {
-      "name": "release",
-      "displayName": "Release (Ninja)",
-      "description": "Release build with optimizations, tests and examples enabled",
-      "inherits": "base",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release"
-      }
+      },
+      "description": "Release build with optimizations, tests and examples enabled",
+      "displayName": "Release (Ninja)",
+      "inherits": "base",
+      "name": "release"
     },
     {
-      "name": "coverage",
-      "displayName": "Coverage (GCC/Clang)",
-      "description": "Debug build with coverage instrumentation",
-      "inherits": "debug",
       "cacheVariables": {
         "CMAKE_CXX_FLAGS": "-O0 -g --coverage",
         "CMAKE_EXE_LINKER_FLAGS": "--coverage"
-      }
+      },
+      "description": "Debug build with coverage instrumentation",
+      "displayName": "Coverage (GCC/Clang)",
+      "inherits": "debug",
+      "name": "coverage"
     },
     {
-      "name": "msvc-debug",
-      "displayName": "MSVC Debug",
-      "description": "Debug build using MSVC generator",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_CXX_CLANG_TIDY": "clang-tidy",
+        "MICROVTK_BUILD_BENCHMARKS": "OFF",
+        "MICROVTK_BUILD_EXAMPLES": "OFF",
+        "MICROVTK_BUILD_TESTS": "OFF"
+      },
+      "description": "Debug analysis build with clang-tidy enabled for public headers",
+      "displayName": "Clang-Tidy (Ninja)",
+      "inherits": "base",
+      "name": "clang-tidy"
+    },
+    {
       "binaryDir": "${sourceDir}/build/${presetName}",
       "cacheVariables": {
         "CMAKE_CXX_STANDARD": "20",
-        "MICROVTK_BUILD_TESTS": "ON",
-        "MICROVTK_BUILD_EXAMPLES": "ON",
         "MICROVTK_BUILD_BENCHMARKS": "ON",
-        "MICROVTK_USE_ZLIB": "ON",
-        "MICROVTK_USE_LZ4": "ON"
+        "MICROVTK_BUILD_EXAMPLES": "ON",
+        "MICROVTK_BUILD_TESTS": "ON",
+        "MICROVTK_USE_LZ4": "ON",
+        "MICROVTK_USE_ZLIB": "ON"
       },
       "condition": {
-        "type": "equals",
         "lhs": "${hostSystemName}",
-        "rhs": "Windows"
-      }
-    }
-  ],
-  "buildPresets": [
-    {
-      "name": "debug",
-      "configurePreset": "debug"
-    },
-    {
-      "name": "release",
-      "configurePreset": "release"
-    },
-    {
-      "name": "coverage",
-      "configurePreset": "coverage"
-    },
-    {
-      "name": "msvc-debug",
-      "configurePreset": "msvc-debug"
+        "rhs": "Windows",
+        "type": "equals"
+      },
+      "description": "Debug build using MSVC generator",
+      "displayName": "MSVC Debug",
+      "name": "msvc-debug"
     }
   ],
   "testPresets": [
     {
-      "name": "all-tests",
       "configurePreset": "debug",
-      "output": {
-        "outputOnFailure": true
-      },
       "execution": {
         "noTestsAction": "error",
         "stopOnFailure": false
+      },
+      "name": "all-tests",
+      "output": {
+        "outputOnFailure": true
       }
     },
     {
-      "name": "msvc-tests",
-      "configurePreset": "msvc-debug",
       "configuration": "Debug",
-      "output": {
-        "outputOnFailure": true
-      },
+      "configurePreset": "msvc-debug",
       "execution": {
         "noTestsAction": "error",
         "stopOnFailure": false
+      },
+      "name": "msvc-tests",
+      "output": {
+        "outputOnFailure": true
       }
     }
-  ]
+  ],
+  "version": 3
 }
