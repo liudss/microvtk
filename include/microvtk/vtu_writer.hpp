@@ -1,11 +1,11 @@
 #pragma once
 
 #include <cstddef>
-#include <fstream>
 #include <microvtk/adapter.hpp>
 #include <microvtk/common/types.hpp>
 #include <microvtk/core/appended_data_writer.hpp>
 #include <microvtk/core/xml_utils.hpp>
+#include <ostream>
 #include <ranges>
 #include <stdexcept>
 #include <string>
@@ -96,6 +96,17 @@ public:
 
   // 5. Write to file
   void write(std::string_view filename) {
+    validateDataSizes();
+    writeAppendedFile(
+        filename, dataBlocksInWriteOrder(),
+        [this](std::ostream& ofs, bool usingCompression) {
+          writeXmlStructure(ofs, usingCompression);
+        },
+        "VtuWriter::write");
+  }
+
+private:
+  void validateDataSizes() const {
     // Late validation of data sizes (snapshot check)
     for (const auto& block : pointDataBlocks_) {
       if (block.numberOfElements != numberOfPoints_ * block.numComponents) {
@@ -111,31 +122,8 @@ public:
             "'.");
       }
     }
-
-    auto orderedBlocks = dataBlocksInWriteOrder();
-    std::vector<std::vector<uint8_t>> compressedBuffers;
-    std::vector<uint64_t> originalSizes;
-    const bool usingCompression =
-        prepareAppendedData(orderedBlocks, compressedBuffers, originalSizes);
-
-    std::ofstream ofs(std::string(filename), std::ios::binary);
-    if (!ofs.is_open()) {
-      throw std::runtime_error(
-          "VtuWriter::write: Failed to open output file '" +
-          std::string(filename) + "'.");
-    }
-    writeXmlStructure(ofs, usingCompression);
-    writeAppendedData(ofs, orderedBlocks, usingCompression, compressedBuffers,
-                      originalSizes);
-
-    ofs << "</VTKFile>";
-    if (!ofs) {
-      throw std::runtime_error("VtuWriter::write: Failed while writing '" +
-                               std::string(filename) + "'.");
-    }
   }
 
-private:
   template <std::ranges::range R1, std::ranges::range R2>
   void validateCellTopology(const R1& connectivity, const R2& offsets) const {
     size_t previous = 0;
