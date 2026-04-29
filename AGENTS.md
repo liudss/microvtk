@@ -50,6 +50,7 @@ rtk git branch -d <type>/<short-description>
 ## CI and Merge Policy
 
 - CI must pass before merging to `master`.
+- Decide whether to merge based on the pull request page status and checks summary.
 - Prefer small PRs that are easy to review and revert.
 - Keep commits focused on one logical change.
 - If a PR is not merged, leave `master` unchanged and delete or revise the branch.
