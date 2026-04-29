@@ -291,7 +291,10 @@ if(MICROVTK_BUILD_TESTS)
         target_link_libraries(unit_tests PRIVATE microvtk GTest::gtest GTest::gtest_main)
 
         include(GoogleTest)
-        gtest_discover_tests(unit_tests)
+        gtest_discover_tests(unit_tests
+            DISCOVERY_MODE PRE_TEST
+            DISCOVERY_TIMEOUT 60
+        )
 
         # Integration Tests (Python + VTK)
         find_program(UV_EXECUTABLE uv)
