@@ -38,21 +38,24 @@ MicroVTK is a header-only C++20 library for high-performance computing (HPC) and
 
 ## Integration
 
-MicroVTK is distributed as a header-only library. Integration via CMake `add_subdirectory` is recommended.
+MicroVTK is distributed as a header-only library. Integration via CMake `FetchContent` or `add_subdirectory` is recommended.
 
-### 1. Submodule Configuration
-```bash
-git submodule add https://github.com/liudss/microvtk.git external/microvtk
-```
-
-### 2. CMake Integration
+### 1. Add MicroVTK to your build
 ```cmake
+include(FetchContent)
+
+FetchContent_Declare(
+    microvtk
+    GIT_REPOSITORY https://github.com/liudss/microvtk.git
+    GIT_TAG master
+)
+
 # Optional: Enable HPC extensions
 set(MICROVTK_USE_KOKKOS ON)
 set(MICROVTK_USE_CABANA ON)
 set(MICROVTK_USE_LZ4 ON)
 
-add_subdirectory(external/microvtk)
+FetchContent_MakeAvailable(microvtk)
 
 add_executable(simulation_solver main.cpp)
 target_link_libraries(simulation_solver PRIVATE microvtk::microvtk)
@@ -243,7 +246,7 @@ microvtk/
 │   └── *_adapter.hpp       # Data Adapters (Standard, HPC, Indexing)
 ├── examples/               # Implementation examples
 ├── tests/                  # Verification suite
-└── external/               # Third-party dependencies
+└── cmake/                  # Local CMake helper modules
 ```
 
 ## License

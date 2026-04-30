@@ -16,7 +16,6 @@ tests/                     GoogleTest unit tests
 tests/integration/         pytest tests that read outputs with VTK Python
 benchmarks/                google/benchmark executables
 cmake/                     Local CMake find modules
-external/                  Vendored or checkout-provided third-party sources
 ```
 
 ## Prerequisites
