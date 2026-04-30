@@ -2,7 +2,6 @@
 
 #include <concepts>
 #include <cstdint>
-#include <functional>
 #include <iostream>
 #include <microvtk/core/binary_utils.hpp>
 #include <optional>
@@ -13,12 +12,40 @@
 
 namespace microvtk::core {
 
+struct ByteWriter {
+  virtual ~ByteWriter() = default;
+  virtual void write(std::span<const uint8_t> bytes) = 0;
+};
+
+class VectorByteWriter : public ByteWriter {
+public:
+  explicit VectorByteWriter(std::vector<uint8_t>& buffer) : buffer_(buffer) {}
+
+  void write(std::span<const uint8_t> bytes) override {
+    buffer_.insert(buffer_.end(), bytes.begin(), bytes.end());
+  }
+
+private:
+  std::vector<uint8_t>& buffer_;
+};
+
+class OstreamByteWriter : public ByteWriter {
+public:
+  explicit OstreamByteWriter(std::ostream& os) : os_(os) {}
+
+  void write(std::span<const uint8_t> bytes) override {
+    os_.write(reinterpret_cast<const char*>(bytes.data()),
+              static_cast<std::streamsize>(bytes.size()));
+  }
+
+private:
+  std::ostream& os_;
+};
+
 // Abstract base class for type-erased data access
 struct DataAccessor {
   virtual ~DataAccessor() = default;
-  virtual void write_to(
-      std::vector<uint8_t>& buffer) const = 0;  // Legacy support (optional)
-  virtual void write_to_stream(std::ostream& os) const = 0;
+  virtual void write_bytes(ByteWriter& writer) const = 0;
   [[nodiscard]] virtual std::optional<std::span<const uint8_t>>
   contiguous_bytes() const = 0;
   [[nodiscard]] virtual size_t size_bytes() const = 0;
@@ -30,39 +57,25 @@ class RangeAccessor : public DataAccessor {
 public:
   explicit RangeAccessor(R range) : range_(std::move(range)) {}
 
-  void write_to(std::vector<uint8_t>& buffer) const override {
-    // This might be inefficient if used, but provided for compatibility
-    microvtk::core::append_range(range_, buffer);
-  }
-
-  void write_to_stream(std::ostream& os) const override {
-    // Determine if we can just write raw bytes
+  void write_bytes(ByteWriter& writer) const override {
     if constexpr (std::ranges::contiguous_range<R> &&
                   std::endian::native == std::endian::little) {
       auto data_span = std::span{range_};
-      os.write(reinterpret_cast<const char*>(data_span.data()),
-               static_cast<std::streamsize>(data_span.size_bytes()));
+      const auto* bytes = reinterpret_cast<const uint8_t*>(data_span.data());
+      writer.write(std::span<const uint8_t>{bytes, data_span.size_bytes()});
     } else {
-      // Slow path: copy to small buffer and write or write element by element
-      // Using a small buffer for buffering is better than 1-byte writes
-      // But for now, let's reuse a small buffer strategy similar to
-      // append_range logic but directed to stream Or just use a local buffer
-      // vector
       std::vector<uint8_t> temp;
-      // Heuristic: reserve some space
       temp.reserve(4096);
 
       for (const auto& val : range_) {
         microvtk::core::write_le(val, temp);
         if (temp.size() >= 4096) {
-          os.write(reinterpret_cast<const char*>(temp.data()),
-                   static_cast<std::streamsize>(temp.size()));
+          writer.write(temp);
           temp.clear();
         }
       }
       if (!temp.empty()) {
-        os.write(reinterpret_cast<const char*>(temp.data()),
-                 static_cast<std::streamsize>(temp.size()));
+        writer.write(temp);
       }
     }
   }

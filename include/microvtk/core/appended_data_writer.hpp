@@ -68,6 +68,27 @@ protected:
     }
   }
 
+  template <typename WriteXmlBody>
+  void writeAppendedVtkFile(std::string_view filename,
+                            const std::vector<DataBlockInfo*>& orderedBlocks,
+                            std::string_view vtkType, std::string_view context,
+                            WriteXmlBody&& writeXmlBody) {
+    writeAppendedFile(
+        filename, orderedBlocks,
+        [this, vtkType, body = std::forward<WriteXmlBody>(writeXmlBody)](
+            std::ostream& ofs, bool usingCompression) mutable {
+          XmlBuilder xml(ofs);
+          writeVtkFileHeader(xml, vtkType, usingCompression);
+
+          body(xml);
+
+          xml.startElement("AppendedData");
+          xml.attribute("encoding", "raw");
+          xml.writeRaw(">_");
+        },
+        context);
+  }
+
   CompressionType compressionType_ = CompressionType::None;
 };
 

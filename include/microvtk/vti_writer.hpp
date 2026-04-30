@@ -32,12 +32,9 @@ public:
   // 3. Write to file
   void write(std::string_view filename) {
     validateDataSizes();
-    writeAppendedFile(
-        filename, dataBlocksInWriteOrder(),
-        [this](std::ostream& ofs, bool usingCompression) {
-          writeXmlStructure(ofs, usingCompression);
-        },
-        "VtiWriter::write");
+    writeAppendedVtkFile(filename, dataBlocksInWriteOrder(), "ImageData",
+                         "VtiWriter::write",
+                         [this](core::XmlBuilder& xml) { writeXmlBody(xml); });
   }
 
 private:
@@ -80,10 +77,7 @@ private:
     return blocks;
   }
 
-  void writeXmlStructure(std::ostream& ofs, bool usingCompression) {
-    core::XmlBuilder xml(ofs);
-    writeVtkFileHeader(xml, "ImageData", usingCompression);
-
+  void writeXmlBody(core::XmlBuilder& xml) {
     {
       auto grid = xml.scopedElement("ImageData");
 
@@ -110,10 +104,6 @@ private:
         writeCellDataHeaders(xml);
       }
     }
-
-    xml.startElement("AppendedData");
-    xml.attribute("encoding", "raw");
-    xml.writeRaw(">_");
   }
 
   std::array<int, 6> wholeExtent_;
