@@ -10,12 +10,12 @@ while read -r local_ref local_sha remote_ref remote_sha; do
 Blocked: direct push to remote master is not allowed.
 
 Use the PR workflow instead:
-  rtk git fetch origin
-  rtk git switch master
-  rtk git merge --ff-only origin/master
-  rtk git switch -c <type>/<short-description>
-  rtk git push -u ${remote_name:-origin} HEAD
-  rtk gh pr create --base master
+  git fetch origin
+  git switch master
+  git merge --ff-only origin/master
+  git switch -c <type>/<short-description>
+  git push -u ${remote_name:-origin} HEAD
+  gh pr create --base master
 
 Remote: ${remote_name:-unknown} ${remote_url:-}
 MSG
