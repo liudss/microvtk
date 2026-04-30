@@ -15,6 +15,35 @@ else()
     set(MICROVTK_IS_TOP_LEVEL OFF)
 endif()
 
+if(MICROVTK_IS_TOP_LEVEL AND CMAKE_EXPORT_COMPILE_COMMANDS AND NOT WIN32)
+    cmake_path(NORMAL_PATH CMAKE_BINARY_DIR OUTPUT_VARIABLE MICROVTK_BINARY_DIR)
+    cmake_path(NORMAL_PATH CMAKE_SOURCE_DIR OUTPUT_VARIABLE MICROVTK_SOURCE_DIR)
+
+    set(MICROVTK_DEBUG_BINARY_DIR "${MICROVTK_SOURCE_DIR}/build/debug")
+    set(MICROVTK_COMPILE_COMMANDS_LINK "${MICROVTK_SOURCE_DIR}/build/compile_commands.json")
+
+    if(MICROVTK_BINARY_DIR STREQUAL MICROVTK_DEBUG_BINARY_DIR)
+        if(IS_SYMLINK "${MICROVTK_COMPILE_COMMANDS_LINK}")
+            file(REMOVE "${MICROVTK_COMPILE_COMMANDS_LINK}")
+        endif()
+
+        if(NOT EXISTS "${MICROVTK_COMPILE_COMMANDS_LINK}")
+            file(CREATE_LINK
+                "debug/compile_commands.json"
+                "${MICROVTK_COMPILE_COMMANDS_LINK}"
+                RESULT MICROVTK_COMPILE_COMMANDS_LINK_RESULT
+                SYMBOLIC
+            )
+            if(NOT MICROVTK_COMPILE_COMMANDS_LINK_RESULT STREQUAL "0")
+                message(WARNING
+                    "MicroVTK: Failed to create build/compile_commands.json symlink: "
+                    "${MICROVTK_COMPILE_COMMANDS_LINK_RESULT}"
+                )
+            endif()
+        endif()
+    endif()
+endif()
+
 # Options
 option(MICROVTK_BUILD_TESTS "Build unit tests" ${MICROVTK_IS_TOP_LEVEL})
 option(MICROVTK_BUILD_EXAMPLES "Build examples" ${MICROVTK_IS_TOP_LEVEL})
@@ -209,15 +238,15 @@ endif()
 if(MICROVTK_USE_LZ4)
     target_compile_definitions(microvtk INTERFACE MICROVTK_HAS_LZ4)
     if(TARGET lz4::lz4)
-         target_link_libraries(microvtk INTERFACE lz4::lz4)
+        target_link_libraries(microvtk INTERFACE lz4::lz4)
     elseif(TARGET lz4_static)
-         target_link_libraries(microvtk INTERFACE lz4_static)
+        target_link_libraries(microvtk INTERFACE lz4_static)
     elseif(TARGET PkgConfig::LZ4)
-         target_link_libraries(microvtk INTERFACE PkgConfig::LZ4)
+        target_link_libraries(microvtk INTERFACE PkgConfig::LZ4)
     else()
-         # Fallback if PkgConfig just gave variables
-         target_include_directories(microvtk INTERFACE ${LZ4_INCLUDE_DIRS})
-         target_link_libraries(microvtk INTERFACE ${LZ4_LIBRARIES})
+        # Fallback if PkgConfig just gave variables
+        target_include_directories(microvtk INTERFACE ${LZ4_INCLUDE_DIRS})
+        target_link_libraries(microvtk INTERFACE ${LZ4_LIBRARIES})
     endif()
 endif()
 
