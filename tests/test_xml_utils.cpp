@@ -56,3 +56,18 @@ TEST(XmlUtils, EscapesStringAttributes) {
   EXPECT_TRUE(output.find("name=\"a&amp;b&lt;c&gt;&quot;d&apos;e\"") !=
               std::string::npos);
 }
+
+TEST(XmlUtils, StartsRawContentWithoutSelfClosingElement) {
+  std::stringstream ss;
+  {
+    XmlBuilder xml(ss);
+    xml.startElement("AppendedData");
+    xml.attribute("encoding", "raw");
+    xml.startRawContent();
+    xml.writeRaw("_payload");
+    xml.endElement();
+  }
+
+  EXPECT_EQ(ss.str(),
+            "<AppendedData encoding=\"raw\">_payload</AppendedData>\n");
+}
