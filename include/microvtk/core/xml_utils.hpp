@@ -76,6 +76,14 @@ public:
   // Writes raw string directly to stream (bypass XML formatting)
   void writeRaw(std::string_view str) { os_ << str; }
 
+  // Opens the current start tag so callers can stream raw element content.
+  void startRawContent() {
+    if (state_ == State::InStartTag) {
+      os_ << ">";
+      state_ = State::Content;
+    }
+  }
+
   // Helper for RAII-style element closing
   class ScopedElement {
     XmlBuilder& builder_;

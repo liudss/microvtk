@@ -84,7 +84,8 @@ protected:
 
           xml.startElement("AppendedData");
           xml.attribute("encoding", "raw");
-          xml.writeRaw(">_");
+          xml.startRawContent();
+          xml.writeRaw("_");
         },
         context);
   }
