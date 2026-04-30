@@ -2,6 +2,7 @@
 #include <microvtk/adapter.hpp>
 #include <microvtk/indexing_adapter.hpp>
 #include <numeric>
+#include <stdexcept>
 #include <vector>
 
 namespace {
@@ -251,4 +252,26 @@ TEST(IndexingAdapter, View2DReordering) {
   EXPECT_EQ(*it++, 1);  // (1,0)
   EXPECT_EQ(*it++, 2);  // (2,0) -> accessed storage[4]
   EXPECT_EQ(*it++, 3);  // (3,0) -> accessed storage[5]
+}
+
+TEST(IndexingAdapter, RejectsInvalidReorderDimensions) {
+  std::vector<int> storage = {1, 2, 3, 4};
+
+  EXPECT_THROW(
+      microvtk::views::reorder_z_curve(storage, std::array<size_t, 3>{0, 1, 1}),
+      std::invalid_argument);
+  EXPECT_THROW(
+      microvtk::views::reorder_z_curve(storage, std::array<size_t, 2>{2, 0}),
+      std::invalid_argument);
+}
+
+TEST(IndexingAdapter, RejectsStorageTooSmallForMortonIndex) {
+  std::vector<int> storage(4, 0);
+
+  EXPECT_THROW(
+      microvtk::views::reorder_z_curve(storage, std::array<size_t, 3>{4, 1, 1}),
+      std::invalid_argument);
+  EXPECT_THROW(
+      microvtk::views::reorder_z_curve(storage, std::array<size_t, 2>{4, 4}),
+      std::invalid_argument);
 }

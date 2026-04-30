@@ -148,6 +148,12 @@ TEST(VtiWriter, DataSizeMismatch) {
   EXPECT_THROW(writer2.write("should_fail_cells.vti"), std::invalid_argument);
 }
 
+TEST(VtiWriter, RejectsInvalidExtentAtConstruction) {
+  const std::array<int, 6> invalidExtent = {1, 0, 0, 0, 0, 0};
+
+  EXPECT_THROW(VtiWriter writer(invalidExtent), std::invalid_argument);
+}
+
 TEST(VtiWriter, ThrowsWhenOutputCannotBeOpened) {
   std::array<int, 6> extent = {0, 0, 0, 0, 0, 0};
   VtiWriter writer(extent);
