@@ -14,7 +14,7 @@ if(TARGET Kokkos::kokkos)
 else()
     # Fallback to standard config mode if target not found
     # This prevents infinite recursion if we were called via find_package in a context
-    # where we actually wanted to search system paths, though here we prioritize the submodule.
+    # where we actually wanted to search system paths.
     # We explicitly look for Config mode to avoid finding THIS module again if it were in the path.
     find_package(Kokkos CONFIG)
 endif()
