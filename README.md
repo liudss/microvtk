@@ -6,6 +6,13 @@
 
 MicroVTK is a header-only C++20 library for high-performance computing (HPC) and scientific visualization workflows. It writes VTK XML artifacts (`.vtu`, `.vti`, `.pvd`) with a streaming-oriented design that keeps memory overhead low and avoids redundant copies on the common contiguous-data paths. The library uses modern C++ range-based adapters to provide type-safe interoperability with contemporary simulation frameworks.
 
+## Documentation
+
+*   [User Guide](docs/user-guide.md): API usage, writer semantics, adapters, compression, and time-series output.
+*   [Architecture](docs/architecture.md): module layout, write pipeline, dependencies, and extension points.
+*   [Development Guide](docs/development.md): local build, test, benchmark, dependency, and contribution workflow.
+*   [Specification](spec.md): architecture notes and implementation-level design summary.
+
 ## Core Capabilities
 
 *   **Zero-Copy Architecture**
@@ -50,6 +57,21 @@ add_subdirectory(external/microvtk)
 add_executable(simulation_solver main.cpp)
 target_link_libraries(simulation_solver PRIVATE microvtk::microvtk)
 ```
+
+### CMake Options
+
+| Option | Default at top level | Description |
+| --- | --- | --- |
+| `MICROVTK_BUILD_TESTS` | `ON` | Build GoogleTest unit tests and register Python integration tests when `uv` is available. |
+| `MICROVTK_BUILD_EXAMPLES` | `ON` | Build example executables. |
+| `MICROVTK_BUILD_BENCHMARKS` | `ON` | Build benchmark executables. |
+| `MICROVTK_USE_ZLIB` | `ON` | Enable ZLIB compression support. |
+| `MICROVTK_USE_LZ4` | `ON` | Enable LZ4 compression support. |
+| `MICROVTK_USE_KOKKOS` | `OFF` | Enable Kokkos adapter support. |
+| `MICROVTK_USE_CABANA` | `OFF` | Enable Cabana adapter support. |
+| `MICROVTK_USE_CPM` | `ON` at top level | Allow CPM.cmake fallback for unresolved dependencies. |
+
+When MicroVTK is consumed through `add_subdirectory`, tests, examples, benchmarks, and CPM fallback default to `OFF` unless the parent project enables them.
 
 ---
 
@@ -175,13 +197,8 @@ for (int step = 0; step < 100; ++step) {
 git clone --recursive https://github.com/liudss/microvtk.git
 cd microvtk
 
-# Configure
-cmake -S . -B build -G Ninja \
-    -D MICROVTK_BUILD_TESTS=ON \
-    -D MICROVTK_BUILD_EXAMPLES=ON
-
-# Build
-cmake --build build
+cmake --preset debug
+cmake --build --preset debug
 ```
 
 ### Testing
@@ -189,7 +206,12 @@ The project implements a two-tier testing strategy: C++ Unit Tests (GoogleTest) 
 
 **Unit Tests:**
 ```bash
-./build/unit_tests
+./build/debug/unit_tests
+```
+
+**CTest Preset:**
+```bash
+ctest --preset all-tests
 ```
 
 **Integration Tests (with Memory Sanitization):**
@@ -203,6 +225,8 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 export MICROVTK_USE_VALGRIND=ON
 uv run pytest tests/integration
 ```
+
+See the [Development Guide](docs/development.md) for release builds, clang-tidy, benchmarks, and dependency resolution details.
 
 ---
 
