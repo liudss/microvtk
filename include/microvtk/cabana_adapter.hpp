@@ -2,6 +2,7 @@
 
 #ifdef MICROVTK_HAS_CABANA
 #include <Cabana_Core.hpp>
+#include <array>
 #include <ranges>
 #include <type_traits>
 
@@ -70,24 +71,7 @@ public:
       if constexpr (R == 1) {
         return (*s)(t_idx, c_idx);
       } else {
-        using T = ValueType;
-        size_t indices[R];
-        size_t temp = c_idx;
-
-        auto compute_idx = [&]<size_t... Is>(std::index_sequence<Is...>) {
-          auto compute_one = [&](auto i_rev) {
-            constexpr size_t d = R - 1 - i_rev;
-            if constexpr (d > 0) {
-              constexpr size_t ext = std::extent_v<T, d>;
-              indices[d] = temp % ext;
-              temp /= ext;
-            } else {
-              indices[0] = temp;
-            }
-          };
-          (compute_one(std::integral_constant<size_t, Is>{}), ...);
-        };
-        compute_idx(std::make_index_sequence<R>{});
+        const auto indices = componentIndices<R>(c_idx);
 
         return [&]<size_t... Is>(std::index_sequence<Is...>) {
           return (*s)(t_idx, indices[Is]...);
@@ -164,6 +148,31 @@ public:
 
     [[nodiscard]] reference operator[](difference_type n) const {
       return *(*this + n);
+    }
+
+  private:
+    template <size_t R>
+      requires(R > 1)
+    [[nodiscard]] static std::array<size_t, R> componentIndices(size_t c_idx) {
+      std::array<size_t, R> indices{};
+      size_t temp = c_idx;
+
+      auto compute = [&]<size_t... Is>(std::index_sequence<Is...>) {
+        auto compute_one = [&](auto i_rev) {
+          constexpr size_t d = R - 1 - i_rev;
+          if constexpr (d > 0) {
+            constexpr size_t ext = std::extent_v<ValueType, d>;
+            indices[d] = temp % ext;
+            temp /= ext;
+          } else {
+            indices[0] = temp;
+          }
+        };
+        (compute_one(std::integral_constant<size_t, Is>{}), ...);
+      };
+      compute(std::make_index_sequence<R>{});
+
+      return indices;
     }
   };
 

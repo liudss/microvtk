@@ -62,6 +62,7 @@ public:
           });
       pointsBlock_ = registerData(padded, "Points", 3);
     }
+    hasPoints_ = true;
   }
 
   // 2. Set Cells (Topology)
@@ -70,6 +71,10 @@ public:
   // types: CellType enum values
   template <std::ranges::range R1, std::ranges::range R2, std::ranges::range R3>
   void setCells(const R1& connectivity, const R2& offsets, const R3& types) {
+    if (!hasPoints_) {
+      throw std::logic_error(
+          "VtuWriter::setCells: points must be set before cells.");
+    }
     if (std::ranges::size(offsets) != std::ranges::size(types)) {
       throw std::invalid_argument(
           "VtuWriter::setCells: Size mismatch between offsets and types.");
@@ -92,6 +97,9 @@ public:
 
 private:
   void validateDataSizes() const {
+    if (!hasPoints_) {
+      throw std::logic_error("VtuWriter::write: points have not been set.");
+    }
     validateAttributeDataSizes(numberOfPoints_, numberOfCells_,
                                "VtuWriter::write");
   }
@@ -179,6 +187,7 @@ private:
 
   size_t numberOfPoints_ = 0;
   size_t numberOfCells_ = 0;
+  bool hasPoints_ = false;
 
   DataBlockInfo pointsBlock_;
   DataBlockInfo cellsConnBlock_;

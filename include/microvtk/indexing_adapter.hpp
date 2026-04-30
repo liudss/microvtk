@@ -3,7 +3,9 @@
 #include <array>
 #include <concepts>
 #include <cstdint>
+#include <limits>
 #include <ranges>
+#include <stdexcept>
 #include <tuple>
 
 #if defined(__x86_64__) || defined(_M_X64)
@@ -83,15 +85,74 @@ namespace views {
 
 namespace detail {
 
+inline size_t checked_product(size_t lhs, size_t rhs) {
+  if (rhs != 0 && lhs > std::numeric_limits<size_t>::max() / rhs) {
+    throw std::invalid_argument(
+        "reorder_z_curve: dimensions overflow output size.");
+  }
+  return lhs * rhs;
+}
+
+template <size_t N>
+size_t total_size(const std::array<size_t, N>& dims) {
+  size_t total = 1;
+  for (const auto dim : dims) {
+    if (dim == 0) {
+      throw std::invalid_argument(
+          "reorder_z_curve: dimensions must be non-zero.");
+    }
+    total = checked_product(total, dim);
+  }
+  return total;
+}
+
+inline uint64_t max_morton_index(std::array<size_t, 3> dims) {
+  constexpr size_t max3dCoordinate = 0x1fffff;
+  for (const auto dim : dims) {
+    if ((dim - 1) > max3dCoordinate) {
+      throw std::invalid_argument(
+          "reorder_z_curve: 3D dimensions exceed Morton coordinate range.");
+    }
+  }
+  return microvtk::detail::morton_encode_3d(static_cast<uint32_t>(dims[0] - 1),
+                                            static_cast<uint32_t>(dims[1] - 1),
+                                            static_cast<uint32_t>(dims[2] - 1));
+}
+
+inline uint64_t max_morton_index(std::array<size_t, 2> dims) {
+  constexpr auto max2dCoordinate =
+      static_cast<size_t>(std::numeric_limits<uint32_t>::max());
+  for (const auto dim : dims) {
+    if ((dim - 1) > max2dCoordinate) {
+      throw std::invalid_argument(
+          "reorder_z_curve: 2D dimensions exceed Morton coordinate range.");
+    }
+  }
+  return microvtk::detail::morton_encode_2d(static_cast<uint32_t>(dims[0] - 1),
+                                            static_cast<uint32_t>(dims[1] - 1));
+}
+
+template <std::ranges::sized_range R, size_t N>
+size_t validate_z_curve_input(const R& range,
+                              const std::array<size_t, N>& dims) {
+  const auto total = total_size(dims);
+  const auto maxIndex = max_morton_index(dims);
+  if (maxIndex >= std::ranges::size(range)) {
+    throw std::invalid_argument(
+        "reorder_z_curve: input range is too small for dimensions.");
+  }
+  return total;
+}
+
 // Implementation of the view logic (3D)
 template <std::ranges::random_access_range R>
+  requires std::ranges::sized_range<R>
 auto reorder_z_curve_impl(R&& range, std::array<size_t, 3> dims) {
+  size_t total = validate_z_curve_input(range, dims);
   size_t nx = dims[0];
   size_t ny = dims[1];
-  size_t nz = dims[2];
-  size_t total_size = nx * ny * nz;
 
-  return std::views::iota(size_t{0}, total_size) |
+  return std::views::iota(size_t{0}, total) |
          std::views::transform(
              [range = std::views::all(std::forward<R>(range)), nx,
               ny](size_t linear_idx) -> std::ranges::range_value_t<R> {
@@ -106,22 +167,18 @@ auto reorder_z_curve_impl(R&& range, std::array<size_t, 3> dims) {
                    static_cast<uint32_t>(x), static_cast<uint32_t>(y),
                    static_cast<uint32_t>(z));
 
-               if (morton_idx >= std::ranges::size(range)) {
-                 return std::ranges::range_value_t<R>{};
-               }
-
                return range[morton_idx];
              });
 }
 
 // Implementation of the view logic (2D)
 template <std::ranges::random_access_range R>
+  requires std::ranges::sized_range<R>
 auto reorder_z_curve_impl(R&& range, std::array<size_t, 2> dims) {
+  size_t total = validate_z_curve_input(range, dims);
   size_t nx = dims[0];
-  size_t ny = dims[1];
-  size_t total_size = nx * ny;
 
-  return std::views::iota(size_t{0}, total_size) |
+  return std::views::iota(size_t{0}, total) |
          std::views::transform(
              [range = std::views::all(std::forward<R>(range)),
               nx](size_t linear_idx) -> std::ranges::range_value_t<R> {
@@ -133,10 +190,6 @@ auto reorder_z_curve_impl(R&& range, std::array<size_t, 2> dims) {
                size_t morton_idx = microvtk::detail::morton_encode_2d(
                    static_cast<uint32_t>(x), static_cast<uint32_t>(y));
 
-               if (morton_idx >= std::ranges::size(range)) {
-                 return std::ranges::range_value_t<R>{};
-               }
-
                return range[morton_idx];
              });
 }
@@ -147,6 +200,7 @@ struct z_curve_adaptor_closure {
   std::array<size_t, N> dims;
 
   template <std::ranges::random_access_range R>
+    requires std::ranges::sized_range<R>
   friend auto operator|(R&& r, const z_curve_adaptor_closure& closure) {
     return reorder_z_curve_impl(std::forward<R>(r), closure.dims);
   }
@@ -178,12 +232,14 @@ inline auto reorder_z_curve(std::array<size_t, 2> dims) {
 
 // 3. Direct call (3D)
 template <std::ranges::random_access_range R>
+  requires std::ranges::sized_range<R>
 auto reorder_z_curve(R&& range, std::array<size_t, 3> dims) {
   return detail::reorder_z_curve_impl(std::forward<R>(range), dims);
 }
 
 // 4. Direct call (2D)
 template <std::ranges::random_access_range R>
+  requires std::ranges::sized_range<R>
 auto reorder_z_curve(R&& range, std::array<size_t, 2> dims) {
   return detail::reorder_z_curve_impl(std::forward<R>(range), dims);
 }
