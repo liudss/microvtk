@@ -43,7 +43,6 @@ protected:
 
     DataBlockInfo info;
     info.name = name;
-    info.offset = currentOffset_;
     info.typeName = microvtk::vtkTypeName<std::remove_const_t<T>>();
     info.numComponents = numComponents;
     info.accessorIndex = accessors_.size();
@@ -51,8 +50,6 @@ protected:
     info.valid = true;
 
     auto accessor = std::make_unique<RangeAccessor<ViewType>>(std::move(view));
-    const uint64_t payloadSize = accessor->size_bytes();
-    currentOffset_ += sizeof(uint64_t) + payloadSize;
     accessors_.push_back(std::move(accessor));
 
     return info;
@@ -122,7 +119,6 @@ private:
   std::vector<std::unique_ptr<DataAccessor>> accessors_;
   std::vector<DataBlockInfo> pointDataBlocks_;
   std::vector<DataBlockInfo> cellDataBlocks_;
-  uint64_t currentOffset_ = 0;
 };
 
 }  // namespace microvtk::core

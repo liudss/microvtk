@@ -15,7 +15,8 @@ TEST(DataAccessor, NonContiguousContainer) {
   RangeAccessor<std::list<int32_t>> accessor(data);
 
   std::stringstream ss;
-  accessor.write_to_stream(ss);
+  OstreamByteWriter writer(ss);
+  accessor.write_bytes(writer);
 
   std::string output = ss.str();
   EXPECT_EQ(output.size(), 5 * sizeof(int32_t));
@@ -51,13 +52,13 @@ TEST(DataAccessor, ContiguousContainerExposesDirectBytes) {
   }
 }
 
-TEST(DataAccessor, LegacyWriteTo) {
-  // Cover the write_to method for backward compatibility/completeness
+TEST(DataAccessor, WritesToVectorByteWriter) {
   std::vector<int32_t> data = {10, 20};
   RangeAccessor<std::vector<int32_t>> accessor(data);
 
   std::vector<uint8_t> buffer;
-  accessor.write_to(buffer);
+  VectorByteWriter writer(buffer);
+  accessor.write_bytes(writer);
 
   EXPECT_EQ(buffer.size(), 2 * sizeof(int32_t));
   const auto* ptr = reinterpret_cast<const int32_t*>(buffer.data());

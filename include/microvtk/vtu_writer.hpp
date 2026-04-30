@@ -85,12 +85,9 @@ public:
   // 5. Write to file
   void write(std::string_view filename) {
     validateDataSizes();
-    writeAppendedFile(
-        filename, dataBlocksInWriteOrder(),
-        [this](std::ostream& ofs, bool usingCompression) {
-          writeXmlStructure(ofs, usingCompression);
-        },
-        "VtuWriter::write");
+    writeAppendedVtkFile(filename, dataBlocksInWriteOrder(), "UnstructuredGrid",
+                         "VtuWriter::write",
+                         [this](core::XmlBuilder& xml) { writeXmlBody(xml); });
   }
 
 private:
@@ -154,10 +151,7 @@ private:
     return blocks;
   }
 
-  void writeXmlStructure(std::ostream& ofs, bool usingCompression) {
-    core::XmlBuilder xml(ofs);
-    writeVtkFileHeader(xml, "UnstructuredGrid", usingCompression);
-
+  void writeXmlBody(core::XmlBuilder& xml) {
     {
       auto grid = xml.scopedElement("UnstructuredGrid");
       {
@@ -181,10 +175,6 @@ private:
         writeCellDataHeaders(xml);
       }
     }
-
-    xml.startElement("AppendedData");
-    xml.attribute("encoding", "raw");
-    xml.writeRaw(">_");
   }
 
   size_t numberOfPoints_ = 0;

@@ -13,10 +13,14 @@
 
 namespace microvtk::core {
 
+struct PreparedCompressedBlock {
+  uint64_t originalSize = 0;
+  std::vector<uint8_t> compressedBuffer;
+};
+
 struct PreparedAppendedData {
   bool usingCompression = false;
-  std::vector<std::vector<uint8_t>> compressedBuffers;
-  std::vector<uint64_t> originalSizes;
+  std::vector<PreparedCompressedBlock> compressedBlocks;
 };
 
 inline void recomputeRawOffsets(
@@ -48,16 +52,18 @@ inline void prepareCompressedBlocks(
     if (directBytes) {
       rawBytes = *directBytes;
     } else {
-      accessor->write_to(tempRaw);
+      VectorByteWriter writer(tempRaw);
+      accessor->write_bytes(writer);
       rawBytes = tempRaw;
     }
 
-    prepared.originalSizes.push_back(rawBytes.size());
-    prepared.compressedBuffers.push_back(compressor->compress(rawBytes));
+    auto& compressedBlock = prepared.compressedBlocks.emplace_back();
+    compressedBlock.originalSize = rawBytes.size();
+    compressedBlock.compressedBuffer = compressor->compress(rawBytes);
 
     block->offset = runningOffset;
     constexpr uint64_t headerSize = 4 * sizeof(uint64_t);
-    runningOffset += headerSize + prepared.compressedBuffers.back().size();
+    runningOffset += headerSize + compressedBlock.compressedBuffer.size();
   }
 }
 
@@ -105,7 +111,8 @@ inline void writeRawBlock(std::ostream& ofs, const DataAccessor& accessor) {
   write_le(dataSize, headerBuf);
   ofs.write(reinterpret_cast<const char*>(headerBuf.data()),
             static_cast<std::streamsize>(headerBuf.size()));
-  accessor.write_to_stream(ofs);
+  OstreamByteWriter writer(ofs);
+  accessor.write_bytes(writer);
 }
 
 inline void writeAppendedData(
@@ -116,8 +123,9 @@ inline void writeAppendedData(
     size_t bufIdx = 0;
     for (const auto* block : orderedBlocks) {
       if (!block->valid) continue;
-      writeCompressedBlock(ofs, prepared.compressedBuffers[bufIdx],
-                           prepared.originalSizes[bufIdx]);
+      const auto& compressedBlock = prepared.compressedBlocks[bufIdx];
+      writeCompressedBlock(ofs, compressedBlock.compressedBuffer,
+                           compressedBlock.originalSize);
       ++bufIdx;
     }
   } else {
