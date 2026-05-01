@@ -123,6 +123,72 @@ jobs:
     - name: Show ccache stats
       run: ccache --show-stats
 
+  install-export-smoke:
+    name: CMake install/export smoke
+    runs-on: ubuntu-24.04
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    - name: Install Dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y ninja-build
+
+    - name: Configure install tree
+      run: |
+        cmake -S . -B build/install-smoke -G Ninja \
+          -D CMAKE_BUILD_TYPE=Release \
+          -D CMAKE_INSTALL_PREFIX="${RUNNER_TEMP}/microvtk-install" \
+          -D MICROVTK_BUILD_TESTS=OFF \
+          -D MICROVTK_BUILD_EXAMPLES=OFF \
+          -D MICROVTK_BUILD_BENCHMARKS=OFF \
+          -D MICROVTK_USE_ZLIB=OFF \
+          -D MICROVTK_USE_LZ4=OFF \
+          -D MICROVTK_USE_KOKKOS=OFF \
+          -D MICROVTK_USE_CABANA=OFF \
+          -D MICROVTK_USE_CPM=OFF \
+          -D MICROVTK_INSTALL=ON
+
+    - name: Install package
+      run: cmake --build build/install-smoke --target install
+
+    - name: Create consumer project
+      run: |
+        cmake -E make_directory "${RUNNER_TEMP}/microvtk-consumer"
+        cat > "${RUNNER_TEMP}/microvtk-consumer/CMakeLists.txt" <<'EOF'
+        cmake_minimum_required(VERSION 3.25)
+        project(microvtk_consumer_smoke LANGUAGES CXX)
+
+        set(CMAKE_CXX_STANDARD 20)
+        set(CMAKE_CXX_STANDARD_REQUIRED ON)
+        set(CMAKE_CXX_EXTENSIONS OFF)
+
+        find_package(microvtk CONFIG REQUIRED)
+
+        add_executable(consumer main.cpp)
+        target_link_libraries(consumer PRIVATE microvtk::microvtk)
+        EOF
+        cat > "${RUNNER_TEMP}/microvtk-consumer/main.cpp" <<'EOF'
+        #include <microvtk/microvtk.hpp>
+
+        int main() {
+            microvtk::PvdWriter writer("smoke.pvd");
+            writer.addStep(0.0, "smoke.vtu");
+            return 0;
+        }
+        EOF
+
+    - name: Build consumer project
+      run: |
+        cmake -S "${RUNNER_TEMP}/microvtk-consumer" \
+          -B "${RUNNER_TEMP}/microvtk-consumer-build" \
+          -G Ninja \
+          -D CMAKE_PREFIX_PATH="${RUNNER_TEMP}/microvtk-install"
+        cmake --build "${RUNNER_TEMP}/microvtk-consumer-build"
+
   build-windows:
     name: Windows (MSVC)
     runs-on: windows-latest

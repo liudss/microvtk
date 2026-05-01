@@ -1,0 +1,40 @@
+@PACKAGE_INIT@
+
+include(CMakeFindDependencyMacro)
+
+set(_MICROVTK_USE_ZLIB @MICROVTK_USE_ZLIB@)
+set(_MICROVTK_USE_LZ4 @MICROVTK_USE_LZ4@)
+set(_MICROVTK_USE_KOKKOS @MICROVTK_USE_KOKKOS@)
+set(_MICROVTK_USE_CABANA @MICROVTK_USE_CABANA@)
+set(_MICROVTK_LZ4_CONFIG_MODE "@MICROVTK_LZ4_CONFIG_MODE@")
+
+if(_MICROVTK_USE_ZLIB)
+    find_dependency(ZLIB)
+endif()
+
+if(_MICROVTK_USE_LZ4)
+    if(_MICROVTK_LZ4_CONFIG_MODE STREQUAL "pkgconfig" OR _MICROVTK_LZ4_CONFIG_MODE STREQUAL "variables")
+        find_dependency(PkgConfig)
+        pkg_check_modules(LZ4 REQUIRED IMPORTED_TARGET liblz4)
+    else()
+        find_dependency(lz4 CONFIG)
+    endif()
+endif()
+
+if(_MICROVTK_USE_KOKKOS)
+    find_dependency(Kokkos)
+endif()
+
+if(_MICROVTK_USE_CABANA)
+    find_dependency(Cabana)
+endif()
+
+include("${CMAKE_CURRENT_LIST_DIR}/microvtkTargets.cmake")
+
+unset(_MICROVTK_USE_ZLIB)
+unset(_MICROVTK_USE_LZ4)
+unset(_MICROVTK_USE_KOKKOS)
+unset(_MICROVTK_USE_CABANA)
+unset(_MICROVTK_LZ4_CONFIG_MODE)
+
+check_required_components(microvtk)

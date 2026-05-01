@@ -1,6 +1,9 @@
 cmake_minimum_required(VERSION 3.25)
 project(microvtk VERSION 0.1.0 LANGUAGES CXX)
 
+include(CMakePackageConfigHelpers)
+include(GNUInstallDirs)
+
 # Standard C++20
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -55,6 +58,20 @@ option(MICROVTK_USE_CABANA "Enable Cabana adapter support" OFF)
 
 set(MICROVTK_USE_CPM_DEFAULT ${MICROVTK_IS_TOP_LEVEL})
 option(MICROVTK_USE_CPM "Allow CPM.cmake fallback for dependencies that find_package cannot resolve" ${MICROVTK_USE_CPM_DEFAULT})
+if(MICROVTK_USE_CPM)
+    set(MICROVTK_INSTALL_DEFAULT OFF)
+else()
+    set(MICROVTK_INSTALL_DEFAULT ON)
+endif()
+option(MICROVTK_INSTALL "Install MicroVTK headers and CMake package files" ${MICROVTK_INSTALL_DEFAULT})
+set(MICROVTK_LZ4_CONFIG_MODE "disabled")
+
+if(MICROVTK_INSTALL AND MICROVTK_USE_CPM)
+    message(FATAL_ERROR
+        "MicroVTK: install/export support requires -DMICROVTK_USE_CPM=OFF. "
+        "Install dependencies through the package manager instead of using the development CPM fallback."
+    )
+endif()
 
 # Dependencies
 function(microvtk_include_cpm)
@@ -227,7 +244,7 @@ add_library(microvtk::microvtk ALIAS microvtk)
 
 target_include_directories(microvtk INTERFACE
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-    $<INSTALL_INTERFACE:include>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
 
 if(MICROVTK_USE_ZLIB)
@@ -239,14 +256,18 @@ if(MICROVTK_USE_LZ4)
     target_compile_definitions(microvtk INTERFACE MICROVTK_HAS_LZ4)
     if(TARGET lz4::lz4)
         target_link_libraries(microvtk INTERFACE lz4::lz4)
+        set(MICROVTK_LZ4_CONFIG_MODE "config")
     elseif(TARGET lz4_static)
         target_link_libraries(microvtk INTERFACE lz4_static)
+        set(MICROVTK_LZ4_CONFIG_MODE "config")
     elseif(TARGET PkgConfig::LZ4)
         target_link_libraries(microvtk INTERFACE PkgConfig::LZ4)
+        set(MICROVTK_LZ4_CONFIG_MODE "pkgconfig")
     else()
         # Fallback if PkgConfig just gave variables
         target_include_directories(microvtk INTERFACE ${LZ4_INCLUDE_DIRS})
         target_link_libraries(microvtk INTERFACE ${LZ4_LIBRARIES})
+        set(MICROVTK_LZ4_CONFIG_MODE "variables")
     endif()
 endif()
 
@@ -266,6 +287,39 @@ if(MICROVTK_USE_CABANA)
     else()
         message(FATAL_ERROR "MicroVTK: Cabana was enabled but no usable Cabana core target was found.")
     endif()
+endif()
+
+if(MICROVTK_INSTALL)
+    write_basic_package_version_file(
+        "${CMAKE_CURRENT_BINARY_DIR}/microvtkConfigVersion.cmake"
+        VERSION "${PROJECT_VERSION}"
+        COMPATIBILITY SameMajorVersion
+    )
+
+    configure_package_config_file(
+        "${CMAKE_CURRENT_SOURCE_DIR}/cmake/microvtkConfig.cmake.in"
+        "${CMAKE_CURRENT_BINARY_DIR}/microvtkConfig.cmake"
+        INSTALL_DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/microvtk"
+    )
+
+    install(TARGETS microvtk
+        EXPORT microvtkTargets
+    )
+
+    install(DIRECTORY include/
+        DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
+    )
+
+    install(EXPORT microvtkTargets
+        NAMESPACE microvtk::
+        DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/microvtk"
+    )
+
+    install(FILES
+        "${CMAKE_CURRENT_BINARY_DIR}/microvtkConfig.cmake"
+        "${CMAKE_CURRENT_BINARY_DIR}/microvtkConfigVersion.cmake"
+        DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/microvtk"
+    )
 endif()
 
 # Helper for strict warnings (only applied to internal targets)
