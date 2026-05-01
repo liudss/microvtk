@@ -182,12 +182,12 @@ function(microvtk_resolve_kokkos)
 endfunction()
 
 function(microvtk_resolve_cabana)
-    if(TARGET Cabana::cabanacore)
+    if(TARGET Cabana::Core OR TARGET Cabana::cabanacore OR TARGET cabanacore)
         return()
     endif()
 
     find_package(Cabana QUIET)
-    if(TARGET Cabana::cabanacore)
+    if(TARGET Cabana::Core OR TARGET Cabana::cabanacore OR TARGET cabanacore)
         return()
     endif()
 
@@ -198,7 +198,7 @@ function(microvtk_resolve_cabana)
     CPMAddPackage(
         NAME cabana
         GITHUB_REPOSITORY ECP-copa/Cabana
-        GIT_TAG v0.6.0
+        GIT_TAG 0.6.1
         OPTIONS
             "Cabana_ENABLE_TESTING OFF"
             "Cabana_ENABLE_EXAMPLES OFF"
@@ -257,7 +257,15 @@ endif()
 
 if(MICROVTK_USE_CABANA)
     target_compile_definitions(microvtk INTERFACE MICROVTK_HAS_CABANA)
-    target_link_libraries(microvtk INTERFACE Cabana::cabanacore)
+    if(TARGET Cabana::Core)
+        target_link_libraries(microvtk INTERFACE Cabana::Core)
+    elseif(TARGET Cabana::cabanacore)
+        target_link_libraries(microvtk INTERFACE Cabana::cabanacore)
+    elseif(TARGET cabanacore)
+        target_link_libraries(microvtk INTERFACE cabanacore)
+    else()
+        message(FATAL_ERROR "MicroVTK: Cabana was enabled but no usable Cabana core target was found.")
+    endif()
 endif()
 
 # Helper for strict warnings (only applied to internal targets)

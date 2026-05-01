@@ -30,6 +30,8 @@
         "MICROVTK_BUILD_BENCHMARKS": "ON",
         "MICROVTK_BUILD_EXAMPLES": "ON",
         "MICROVTK_BUILD_TESTS": "ON",
+        "MICROVTK_USE_CABANA": "ON",
+        "MICROVTK_USE_KOKKOS": "ON",
         "MICROVTK_USE_LZ4": "ON",
         "MICROVTK_USE_ZLIB": "ON"
       },
@@ -85,6 +87,8 @@
         "MICROVTK_BUILD_BENCHMARKS": "ON",
         "MICROVTK_BUILD_EXAMPLES": "ON",
         "MICROVTK_BUILD_TESTS": "ON",
+        "MICROVTK_USE_CABANA": "ON",
+        "MICROVTK_USE_KOKKOS": "ON",
         "MICROVTK_USE_LZ4": "ON",
         "MICROVTK_USE_ZLIB": "ON"
       },
