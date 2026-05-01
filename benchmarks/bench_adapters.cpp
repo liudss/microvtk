@@ -128,7 +128,10 @@ static void BM_Indexing_Manual_2D(benchmark::State& state) {
   state.SetBytesProcessed(static_cast<int64_t>(state.iterations()) *
                           static_cast<int64_t>(size) * sizeof(double));
 }
-BENCHMARK(BM_Indexing_Manual_2D)->Range(4096, 262144);  // 64^2 to 512^2 approx
+BENCHMARK(BM_Indexing_Manual_2D)
+    ->Args({4096})    // 64^2
+    ->Args({16384})   // 128^2
+    ->Args({262144}); // 512^2
 
 static void BM_Indexing_Adapter_2D(benchmark::State& state) {
   size_t n = static_cast<size_t>(std::sqrt(state.range(0)));
@@ -150,7 +153,10 @@ static void BM_Indexing_Adapter_2D(benchmark::State& state) {
   state.SetBytesProcessed(static_cast<int64_t>(state.iterations()) *
                           static_cast<int64_t>(size) * sizeof(double));
 }
-BENCHMARK(BM_Indexing_Adapter_2D)->Range(4096, 262144);
+BENCHMARK(BM_Indexing_Adapter_2D)
+    ->Args({4096})    // 64^2
+    ->Args({16384})   // 128^2
+    ->Args({262144}); // 512^2
 
 // ----------------------------------------------------------------------------
 // Kokkos Benchmarks
