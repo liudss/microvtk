@@ -198,7 +198,7 @@ function(microvtk_resolve_cabana)
     CPMAddPackage(
         NAME cabana
         GITHUB_REPOSITORY ECP-copa/Cabana
-        GIT_TAG 0.6.0
+        GIT_TAG 0.6.1
         OPTIONS
             "Cabana_ENABLE_TESTING OFF"
             "Cabana_ENABLE_EXAMPLES OFF"
